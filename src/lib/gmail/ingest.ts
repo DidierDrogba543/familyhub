@@ -3,6 +3,7 @@ import { classifyEmail } from "../ai/classify";
 import { extractFromEmail } from "../ai/extract";
 import { extractTextFromAttachments } from "../ai/attachments";
 import { findDocumentLinks, downloadAndExtract } from "../ai/links";
+import { updateOntology } from "../ai/ontology";
 import type {
   Child,
   ChildActivity,
@@ -189,6 +190,22 @@ export async function ingestEmailBatch(
       } else {
         itemsExtracted++;
       }
+    }
+
+    // Stage 3: Update ontology with accumulated knowledge from this email
+    try {
+      const schoolNames = [...new Set(ctx.children.map((c) => c.school_name))];
+      const childNames = ctx.children.map((c) => c.name);
+      const ontologyResult = await updateOntology(
+        { householdId: ctx.householdId, childNames, schoolNames, supabase: ctx.supabase },
+        { subject: message.subject, from: message.from, body: fullBody, messageId: msg.id }
+      );
+      if (ontologyResult.entitiesUpdated.length > 0) {
+        console.log(`Ontology: updated ${ontologyResult.entitiesUpdated.length} entities from "${message.subject}"`);
+      }
+    } catch (err) {
+      // Ontology updates are non-blocking — don't fail the ingestion
+      console.error(`Ontology update failed for ${msg.id}:`, err);
     }
   }
 

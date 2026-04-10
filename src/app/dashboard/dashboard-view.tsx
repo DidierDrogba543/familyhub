@@ -215,6 +215,9 @@ export default function DashboardView() {
           <a href="/clubs" className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
             Club Schedule
           </a>
+          <a href="/knowledge" className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Knowledge Base
+          </a>
         </div>
 
         {/* Children */}
