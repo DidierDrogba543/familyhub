@@ -171,6 +171,16 @@ export default function DashboardView() {
           </button>
         </div>
 
+        {/* Navigation */}
+        <div className="flex gap-3 mb-6">
+          <a href="/calendar" className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Weekly Calendar
+          </a>
+          <a href="/clubs" className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Club Schedule
+          </a>
+        </div>
+
         {/* Children */}
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
