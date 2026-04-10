@@ -2,6 +2,7 @@ import { createGmailClient, fetchEmails, fetchMessageContent } from "./client";
 import { classifyEmail } from "../ai/classify";
 import { extractFromEmail } from "../ai/extract";
 import { extractTextFromAttachments } from "../ai/attachments";
+import { findDocumentLinks, downloadAndExtract } from "../ai/links";
 import type {
   Child,
   ChildActivity,
@@ -106,6 +107,21 @@ export async function ingestEmailBatch(
         }
       } catch (err) {
         console.error(`Attachment extraction failed for ${msg.id}:`, err);
+      }
+    }
+
+    // Follow document download links (ParentMail, school portals, etc.)
+    const docLinks = findDocumentLinks(message.body);
+    if (docLinks.length > 0) {
+      for (const link of docLinks.slice(0, 3)) { // Max 3 links per email
+        try {
+          const downloaded = await downloadAndExtract(link);
+          if (downloaded && downloaded.text) {
+            fullBody += "\n--- LINKED DOCUMENT: " + downloaded.filename + " ---\n" + downloaded.text.slice(0, 5000);
+          }
+        } catch (err) {
+          console.error(`Link download failed for ${link}:`, err);
+        }
       }
     }
 
