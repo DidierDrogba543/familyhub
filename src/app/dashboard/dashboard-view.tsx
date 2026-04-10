@@ -43,6 +43,10 @@ export default function DashboardView() {
   const [householdId, setHouseholdId] = useState("");
   const [showAddChild, setShowAddChild] = useState(false);
   const [newChild, setNewChild] = useState({ name: "", school_name: "", year_group: "" });
+  const [addingActivityFor, setAddingActivityFor] = useState<string | null>(null);
+  const [newActivity, setNewActivity] = useState({ activity_name: "", day_of_week: "", time_slot: "" });
+  const [showAddSender, setShowAddSender] = useState(false);
+  const [newSender, setNewSender] = useState({ email_address: "", label: "", category: "school" as const });
 
   const supabase = createClient();
 
@@ -126,6 +130,23 @@ export default function DashboardView() {
     }
   };
 
+  const addActivity = async (childId: string) => {
+    if (!newActivity.activity_name) return;
+    await supabase.from("child_activities").insert({
+      child_id: childId,
+      activity_name: newActivity.activity_name,
+      day_of_week: newActivity.day_of_week || null,
+      time_slot: newActivity.time_slot || null,
+    });
+    // Update local state
+    setChildren(children.map((c) => {
+      if (c.id !== childId) return c;
+      return { ...c, activities: [...c.activities, { ...newActivity, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null }] };
+    }));
+    setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" });
+    setAddingActivityFor(null);
+  };
+
   const removeChild = async (childId: string, childName: string) => {
     if (!confirm(`Remove ${childName}? This will also delete their activities.`)) return;
     await supabase.from("child_activities").delete().eq("child_id", childId);
@@ -136,6 +157,21 @@ export default function DashboardView() {
   const removeSender = async (senderId: string) => {
     await supabase.from("known_senders").delete().eq("id", senderId);
     setSenders(senders.filter((s) => s.id !== senderId));
+  };
+
+  const addSender = async () => {
+    if (!newSender.email_address || !newSender.label || !householdId) return;
+    const { data } = await supabase.from("known_senders").insert({
+      household_id: householdId,
+      email_address: newSender.email_address,
+      label: newSender.label,
+      category: newSender.category,
+    }).select("*").single();
+    if (data) {
+      setSenders([...senders, data]);
+      setNewSender({ email_address: "", label: "", category: "school" });
+      setShowAddSender(false);
+    }
   };
 
   if (loading) {
@@ -221,6 +257,20 @@ export default function DashboardView() {
                     ))}
                   </div>
                 )}
+                {addingActivityFor === child.id ? (
+                  <div className="mt-3 flex gap-2 items-end">
+                    <input type="text" value={newActivity.activity_name} onChange={(e) => setNewActivity({ ...newActivity, activity_name: e.target.value })} placeholder="Activity name" className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
+                    <select value={newActivity.day_of_week} onChange={(e) => setNewActivity({ ...newActivity, day_of_week: e.target.value })} className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs">
+                      <option value="">Day</option>
+                      {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input type="text" value={newActivity.time_slot} onChange={(e) => setNewActivity({ ...newActivity, time_slot: e.target.value })} placeholder="Time" className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
+                    <button onClick={() => addActivity(child.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">Add</button>
+                    <button onClick={() => { setAddingActivityFor(null); setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" }); }} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setAddingActivityFor(child.id)} className="mt-2 text-xs text-blue-500 hover:text-blue-600">+ Add activity</button>
+                )}
               </div>
             ))
           )}
@@ -276,12 +326,12 @@ export default function DashboardView() {
         </div>
 
         {/* Known Senders */}
-        {senders.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Known Senders
-            </h2>
-            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Known Senders
+          </h2>
+          {senders.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-3">
               {senders.map((sender) => (
                 <div key={sender.id} className="px-4 py-3 flex items-center justify-between">
                   <div>
@@ -297,8 +347,30 @@ export default function DashboardView() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+
+          {showAddSender ? (
+            <div className="bg-white rounded-xl p-4 border-2 border-green-200">
+              <div className="space-y-3">
+                <input type="email" value={newSender.email_address} onChange={(e) => setNewSender({ ...newSender, email_address: e.target.value })} placeholder="Email address (e.g. office@stmarys.sch.uk)" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input type="text" value={newSender.label} onChange={(e) => setNewSender({ ...newSender, label: e.target.value })} placeholder="Label (e.g. St Mary's School Office)" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <select value={newSender.category} onChange={(e) => setNewSender({ ...newSender, category: e.target.value as "school" | "club" | "pta" | "afterschool" | "other" })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <option value="school">School</option>
+                  <option value="club">Club / Activity</option>
+                  <option value="pta">PTA</option>
+                  <option value="afterschool">After-school care</option>
+                  <option value="other">Other</option>
+                </select>
+                <div className="flex gap-2">
+                  <button onClick={addSender} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">Save</button>
+                  <button onClick={() => { setShowAddSender(false); setNewSender({ email_address: "", label: "", category: "school" }); }} className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddSender(true)} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-gray-400 hover:text-gray-500 text-sm">+ Add known sender</button>
+          )}
+        </div>
 
         {/* Extracted Items */}
         <div>
