@@ -111,7 +111,8 @@ export async function ingestEmailBatch(
     }
 
     // Follow document download links (ParentMail, school portals, etc.)
-    const docLinks = findDocumentLinks(message.body);
+    // Search both text body and HTML body for links (HTML has href attributes)
+    const docLinks = findDocumentLinks(message.body + "\n" + (message.htmlBody || ""));
     if (docLinks.length > 0) {
       for (const link of docLinks.slice(0, 3)) { // Max 3 links per email
         try {

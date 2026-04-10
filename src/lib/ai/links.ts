@@ -9,24 +9,35 @@ const MAX_DOWNLOAD_SIZE = 15 * 1024 * 1024; // 15MB
  * wrapper emails with links to the actual content.
  */
 export function findDocumentLinks(body: string): string[] {
-  // Match URLs ending in downloadable extensions
+  // Match URLs from href attributes and plain text
+  // Captures URLs in href="...", href='...', and bare URLs
+  const hrefPattern = /href=["']?(https?:\/\/[^"'\s<>]+)/gi;
+  const hrefMatches: string[] = [];
+  let m;
+  while ((m = hrefPattern.exec(body)) !== null) {
+    hrefMatches.push(m[1]);
+  }
+
+  // Also match bare URLs ending in downloadable extensions
   const urlPattern = /https?:\/\/[^\s"'<>]+\.(?:docx|doc|pdf|png|jpg|jpeg)(?:[^\s"'<>]*)?/gi;
-  const matches = body.match(urlPattern) || [];
+  const bareMatches = body.match(urlPattern) || [];
 
-  // Also match ParentMail-style download links (may not have extension in URL)
-  const parentMailPattern = /https?:\/\/pmx\.parentmail\.co\.uk\/download\/[^\s"'<>]+/gi;
-  const pmMatches = body.match(parentMailPattern) || [];
+  // Combine all matches
+  const allUrls = [...hrefMatches, ...bareMatches];
 
-  // Deduplicate
-  const allLinks = [...new Set([...matches, ...pmMatches])];
-
-  return allLinks.filter((link) => {
-    // Only follow links that look like document downloads
+  // Filter to only document/download links
+  const docLinks = allUrls.filter((link) => {
     return DOWNLOADABLE_EXTENSIONS.some((ext) => link.toLowerCase().includes(ext))
       || link.includes("parentmail.co.uk/download")
       || link.includes("/attachment")
       || link.includes("/download");
   });
+
+  // Clean trailing punctuation/quotes that might have been captured
+  const cleaned = docLinks.map((link) => link.replace(/[)"']+$/, ""));
+
+  // Deduplicate
+  return [...new Set(cleaned)];
 }
 
 /**

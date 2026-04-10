@@ -105,6 +105,7 @@ export interface GmailMessage {
   from: string;
   date: string;
   body: string;
+  htmlBody: string;
   snippet: string;
   attachments: GmailAttachment[];
 }

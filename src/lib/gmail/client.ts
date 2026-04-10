@@ -87,6 +87,8 @@ export async function fetchMessageContent(
   // Extract body text (handle multipart)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = extractBody(msg.data.payload as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const htmlBody = extractHtmlBody(msg.data.payload as any);
 
   // Extract attachments (PDFs, images)
   const attachments = await extractAttachments(gmail, messageId, msg.data.payload);
@@ -98,6 +100,7 @@ export async function fetchMessageContent(
     from,
     date,
     body,
+    htmlBody,
     snippet: msg.data.snippet ?? "",
     attachments,
   };
@@ -143,6 +146,27 @@ function extractBody(
     }
   }
 
+  return "";
+}
+
+/**
+ * Extract the raw HTML body to find links in href attributes.
+ */
+function extractHtmlBody(
+  payload: Record<string, unknown> | undefined | null
+): string {
+  if (!payload) return "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = payload as any;
+  if (p.mimeType === "text/html" && p.body?.data) {
+    return Buffer.from(p.body.data, "base64").toString("utf-8");
+  }
+  if (p.parts) {
+    for (const part of p.parts) {
+      const html = extractHtmlBody(part);
+      if (html) return html;
+    }
+  }
   return "";
 }
 
