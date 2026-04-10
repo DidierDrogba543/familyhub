@@ -92,6 +92,12 @@ export interface ExtractionResult {
 }
 
 // Gmail types
+export interface GmailAttachment {
+  filename: string;
+  mimeType: string;
+  data: Buffer; // raw attachment bytes
+}
+
 export interface GmailMessage {
   id: string;
   threadId: string;
@@ -100,4 +106,5 @@ export interface GmailMessage {
   date: string;
   body: string;
   snippet: string;
+  attachments: GmailAttachment[];
 }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { ingestEmailBatch } from "@/lib/gmail/ingest";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env.local explicitly for server-side API routes, overriding empty values
+config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
 /**
  * POST /api/ingest
@@ -22,7 +27,17 @@ export async function POST(request: Request) {
     .select("household_id, access_token, refresh_token, expiry_date");
 
   if (hErr || !households) {
-    return NextResponse.json({ error: "Failed to fetch households" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch households", detail: hErr?.message }, { status: 500 });
+  }
+
+  // Debug: log what we have (remove after testing)
+  console.log("Households found:", households.length);
+  console.log("Google Client ID set:", !!process.env.GOOGLE_CLIENT_ID);
+  console.log("Google Client Secret set:", !!process.env.GOOGLE_CLIENT_SECRET);
+  console.log("ANTHROPIC_API_KEY set:", !!process.env.ANTHROPIC_API_KEY);
+  console.log("ANTHROPIC_API_KEY value:", process.env.ANTHROPIC_API_KEY?.slice(0, 15));
+  for (const h of households) {
+    console.log(`Household ${h.household_id}: token=${h.access_token?.slice(0, 20)}... refresh=${!!h.refresh_token} expiry=${h.expiry_date}`);
   }
 
   const results = [];

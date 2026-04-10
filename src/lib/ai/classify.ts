@@ -1,8 +1,21 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import type { ClassificationResult, KnownSender, Child } from "../types";
 
+function getApiKey(): string {
+  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+  // Fallback: read directly from .env.local
+  try {
+    const envFile = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
+    const match = envFile.match(/^ANTHROPIC_API_KEY=(.+)$/m);
+    if (match) return match[1].trim();
+  } catch { /* ignore */ }
+  throw new Error("ANTHROPIC_API_KEY not found");
+}
+
 function getAnthropic() {
-  return new Anthropic();
+  return new Anthropic({ apiKey: getApiKey() });
 }
 
 /**

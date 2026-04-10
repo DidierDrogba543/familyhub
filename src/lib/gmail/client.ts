@@ -88,6 +88,9 @@ export async function fetchMessageContent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = extractBody(msg.data.payload as any);
 
+  // Extract attachments (PDFs, images)
+  const attachments = await extractAttachments(gmail, messageId, msg.data.payload);
+
   return {
     id: msg.data.id ?? messageId,
     threadId: msg.data.threadId ?? "",
@@ -96,6 +99,7 @@ export async function fetchMessageContent(
     date,
     body,
     snippet: msg.data.snippet ?? "",
+    attachments,
   };
 }
 
@@ -140,4 +144,72 @@ function extractBody(
   }
 
   return "";
+}
+
+const SUPPORTED_ATTACHMENT_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+];
+
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
+
+/**
+ * Extract supported attachments (PDFs, images) from an email.
+ * Downloads the attachment data via the Gmail API.
+ */
+async function extractAttachments(
+  gmail: ReturnType<typeof google.gmail>,
+  messageId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: any
+): Promise<{ filename: string; mimeType: string; data: Buffer }[]> {
+  if (!payload?.parts) return [];
+
+  const attachments: { filename: string; mimeType: string; data: Buffer }[] = [];
+
+  for (const part of payload.parts) {
+    // Check nested multipart
+    if (part.parts) {
+      const nested = await extractAttachments(gmail, messageId, part);
+      attachments.push(...nested);
+      continue;
+    }
+
+    if (
+      !part.filename ||
+      !part.body?.attachmentId ||
+      !SUPPORTED_ATTACHMENT_TYPES.includes(part.mimeType)
+    ) {
+      continue;
+    }
+
+    // Skip large attachments
+    if (part.body.size && part.body.size > MAX_ATTACHMENT_SIZE) continue;
+
+    try {
+      const attachment = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId,
+        id: part.body.attachmentId,
+      });
+
+      if (attachment.data.data) {
+        // Gmail returns URL-safe base64
+        const data = Buffer.from(attachment.data.data, "base64");
+        attachments.push({
+          filename: part.filename,
+          mimeType: part.mimeType,
+          data,
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to download attachment ${part.filename}:`, err);
+    }
+  }
+
+  return attachments;
 }

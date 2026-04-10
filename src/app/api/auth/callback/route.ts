@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/onboarding";
+  const defaultNext = "/onboarding"; // Will be overridden to /dashboard if household exists
 
   if (!code) {
     return NextResponse.redirect(`${origin}/auth/error`);
@@ -97,5 +97,17 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Redirect to dashboard if user already has children, otherwise onboarding
+  let redirectTo = defaultNext;
+  if (providerToken) {
+    const { data: existingChildren } = await supabase
+      .from("children")
+      .select("id")
+      .limit(1);
+    if (existingChildren && existingChildren.length > 0) {
+      redirectTo = "/dashboard";
+    }
+  }
+
+  return NextResponse.redirect(`${origin}${redirectTo}`);
 }

@@ -1,6 +1,7 @@
 import { createGmailClient, fetchEmails, fetchMessageContent } from "./client";
 import { classifyEmail } from "../ai/classify";
 import { extractFromEmail } from "../ai/extract";
+import { extractTextFromAttachments } from "../ai/attachments";
 import type {
   Child,
   ChildActivity,
@@ -95,11 +96,24 @@ export async function ingestEmailBatch(
 
     emailsClassifiedSchool++;
 
+    // Process attachments (PDFs, images) to extract additional text
+    let fullBody = message.body;
+    if (message.attachments.length > 0) {
+      try {
+        const attachmentText = await extractTextFromAttachments(message.attachments);
+        if (attachmentText) {
+          fullBody = message.body + "\n" + attachmentText;
+        }
+      } catch (err) {
+        console.error(`Attachment extraction failed for ${msg.id}:`, err);
+      }
+    }
+
     // Stage 2: Extract
     const extractions = await extractFromEmail(
       message.subject,
       message.from,
-      message.body,
+      fullBody,
       ctx.children,
       ctx.activities,
       today
