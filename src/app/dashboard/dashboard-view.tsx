@@ -11,6 +11,7 @@ interface ChildActivity {
   term: string | null;
   link_url: string | null;
   link_label: string | null;
+  kit_items: string[];
 }
 
 interface Child {
@@ -93,6 +94,8 @@ export default function DashboardView() {
   const [newActivity, setNewActivity] = useState({ activity_name: "", day_of_week: "", time_slot: "", link_url: "", link_label: "" });
   const [editingLinkFor, setEditingLinkFor] = useState<string | null>(null);
   const [editLink, setEditLink] = useState({ link_url: "", link_label: "" });
+  const [editingKitFor, setEditingKitFor] = useState<string | null>(null);
+  const [newKitItem, setNewKitItem] = useState("");
   const [showAddSender, setShowAddSender] = useState(false);
   const [newSender, setNewSender] = useState({ email_address: "", label: "", category: "school" as const });
   const [settingsTermFilter, setSettingsTermFilter] = useState("Summer 2026");
@@ -118,7 +121,7 @@ export default function DashboardView() {
 
       const childrenWithActivities: Child[] = [];
       for (const child of childrenRes.data ?? []) {
-        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot, term, link_url, link_label").eq("child_id", child.id);
+        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot, term, link_url, link_label, kit_items").eq("child_id", child.id);
         childrenWithActivities.push({ ...child, activities: activities ?? [] });
       }
       setChildren(childrenWithActivities);
@@ -176,6 +179,30 @@ export default function DashboardView() {
     }));
     setEditingLinkFor(null);
     setEditLink({ link_url: "", link_label: "" });
+  };
+
+  const addKitItem = async (childId: string, activityId: string) => {
+    if (!newKitItem.trim()) return;
+    const child = children.find((c) => c.id === childId);
+    const act = child?.activities.find((a) => a.id === activityId);
+    const current = act?.kit_items || [];
+    const updated = [...current, newKitItem.trim()];
+    await supabase.from("child_activities").update({ kit_items: updated }).eq("id", activityId);
+    setChildren(children.map((c) => c.id !== childId ? c : {
+      ...c, activities: c.activities.map((a) => a.id !== activityId ? a : { ...a, kit_items: updated }),
+    }));
+    setNewKitItem("");
+  };
+
+  const removeKitItem = async (childId: string, activityId: string, itemIndex: number) => {
+    const child = children.find((c) => c.id === childId);
+    const act = child?.activities.find((a) => a.id === activityId);
+    const current = act?.kit_items || [];
+    const updated = current.filter((_, i) => i !== itemIndex);
+    await supabase.from("child_activities").update({ kit_items: updated }).eq("id", activityId);
+    setChildren(children.map((c) => c.id !== childId ? c : {
+      ...c, activities: c.activities.map((a) => a.id !== activityId ? a : { ...a, kit_items: updated }),
+    }));
   };
 
   const removeActivity = async (childId: string, activityId: string) => {
@@ -304,6 +331,9 @@ export default function DashboardView() {
                                 {act.link_url && (
                                   <a href={act.link_url} target="_blank" rel="noopener noreferrer" className="text-[8px] text-blue-400 hover:text-blue-500">{act.link_label || "↗"}</a>
                                 )}
+                                {(act.kit_items || []).length > 0 && (
+                                  <p className="text-[8px] text-amber-500" title={(act.kit_items || []).join(", ")}>🎒 {(act.kit_items || []).join(", ")}</p>
+                                )}
                               </div>
                             );
                           }) : (
@@ -425,17 +455,50 @@ export default function DashboardView() {
                   {filteredActivities.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {filteredActivities.map((act) => (
-                        <div key={act.id} className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-                            {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
-                            <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
-                          </span>
-                          {act.link_url ? (
-                            <a href={act.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600">
-                              {act.link_label || "Link"} ↗
-                            </a>
-                          ) : (
-                            <button onClick={() => { setEditingLinkFor(act.id); setEditLink({ link_url: "", link_label: "" }); }} className="text-[10px] text-gray-300 hover:text-blue-500">+ link</button>
+                        <div key={act.id} className="mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                              {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
+                              <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
+                            </span>
+                            {act.link_url ? (
+                              <a href={act.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600">
+                                {act.link_label || "Link"} ↗
+                              </a>
+                            ) : (
+                              <button onClick={() => { setEditingLinkFor(act.id); setEditLink({ link_url: "", link_label: "" }); }} className="text-[10px] text-gray-300 hover:text-blue-500">+ link</button>
+                            )}
+                            <button onClick={() => setEditingKitFor(editingKitFor === act.id ? null : act.id)} className="text-[10px] text-gray-300 hover:text-amber-500">
+                              {(act.kit_items || []).length > 0 ? `🎒 ${(act.kit_items || []).length}` : "+ kit"}
+                            </button>
+                          </div>
+
+                          {/* Kit items display */}
+                          {(act.kit_items || []).length > 0 && editingKitFor !== act.id && (
+                            <div className="ml-2 mt-1 flex flex-wrap gap-1">
+                              {(act.kit_items || []).map((item, ki) => (
+                                <span key={ki} className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">🎒 {item}</span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Kit items editor */}
+                          {editingKitFor === act.id && (
+                            <div className="ml-2 mt-2 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                              <p className="text-[10px] text-amber-600 font-medium mb-1">Kit list for {act.activity_name}</p>
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {(act.kit_items || []).map((item, ki) => (
+                                  <span key={ki} className="inline-flex items-center gap-1 text-[10px] bg-white text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                    {item}
+                                    <button onClick={() => removeKitItem(child.id, act.id, ki)} className="text-amber-400 hover:text-red-500">×</button>
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex gap-1">
+                                <input type="text" value={newKitItem} onChange={(e) => setNewKitItem(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addKitItem(child.id, act.id)} placeholder="Add item (e.g. shin pads)" className="flex-1 px-2 py-1 border border-amber-300 rounded text-xs" />
+                                <button onClick={() => addKitItem(child.id, act.id)} className="px-2 py-1 bg-amber-500 text-white rounded text-xs">Add</button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))}
