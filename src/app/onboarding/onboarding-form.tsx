@@ -99,8 +99,10 @@ export default function OnboardingForm() {
 
       if (step === 1) {
         // Save children and their activities
+        const schoolNames = new Set<string>();
         for (const child of children) {
           if (!child.name || !child.school_name) continue;
+          schoolNames.add(child.school_name);
 
           const { data: savedChild } = await supabase
             .from("children")
@@ -125,6 +127,35 @@ export default function OnboardingForm() {
             }
           }
         }
+
+        // Auto-create school knowledge entries for each unique school
+        for (const schoolName of schoolNames) {
+          const { data: existing } = await supabase
+            .from("school_knowledge")
+            .select("id")
+            .eq("household_id", household.id)
+            .eq("school_name", schoolName)
+            .single();
+          if (!existing) {
+            await supabase.from("school_knowledge").insert({
+              household_id: household.id,
+              school_name: schoolName,
+              staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [],
+            });
+          }
+        }
+
+        // Auto-create child knowledge entries
+        const { data: savedChildren } = await supabase
+          .from("children").select("id").eq("household_id", household.id);
+        for (const child of savedChildren ?? []) {
+          const { data: existing } = await supabase
+            .from("child_knowledge").select("id").eq("child_id", child.id).single();
+          if (!existing) {
+            await supabase.from("child_knowledge").insert({ child_id: child.id });
+          }
+        }
+
         setStep(2);
       } else if (step === 2) {
         // Save known senders

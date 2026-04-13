@@ -125,7 +125,17 @@ export default function DashboardView() {
   const addChild = async () => {
     if (!newChild.name || !newChild.school_name) return;
     const { data: savedChild } = await supabase.from("children").insert({ household_id: householdId, name: newChild.name, school_name: newChild.school_name, year_group: newChild.year_group || null }).select("id, name, school_name, year_group").single();
-    if (savedChild) { setChildren([...children, { ...savedChild, activities: [] }]); setNewChild({ name: "", school_name: "", year_group: "" }); setShowAddChild(false); }
+    if (savedChild) {
+      setChildren([...children, { ...savedChild, activities: [] }]);
+      // Auto-create school knowledge entry if it doesn't exist
+      const { data: existingSchool } = await supabase.from("school_knowledge").select("id").eq("household_id", householdId).eq("school_name", newChild.school_name).single();
+      if (!existingSchool) {
+        await supabase.from("school_knowledge").insert({ household_id: householdId, school_name: newChild.school_name, staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [] });
+      }
+      // Auto-create child knowledge entry
+      await supabase.from("child_knowledge").insert({ child_id: savedChild.id }).catch(() => {});
+      setNewChild({ name: "", school_name: "", year_group: "" }); setShowAddChild(false);
+    }
   };
 
   const addActivity = async (childId: string) => {
