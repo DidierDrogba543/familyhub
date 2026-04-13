@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   // Build context for the AI
   const context = `
 CHILDREN:
-${children.map((c) => `- ${c.name}: ${c.school_name}, ${c.year_group || "year group unknown"}`).join("\n")}
+${children.map((c) => `- ${c.name} (id: ${c.id}): ${c.school_name}, ${c.year_group || "year group unknown"}`).join("\n")}
 
 CHILD ACTIVITIES:
 ${activities.map((a: Record<string, unknown>) => `- ${(a as Record<string, Record<string, unknown>>).children?.name}: ${a.activity_name} (${a.day_of_week || "day unknown"}, ${a.time_slot || "time unknown"})`).join("\n") || "None"}
@@ -120,9 +120,31 @@ For each suggestion, provide:
 - priority: high | medium | low
 - title: short description (under 80 chars)
 - description: explain what you found and what should change (2-3 sentences)
-- action: the specific data change to make if approved
+- action: human-readable description of the change
 - entity_type: school | club | child | family | item (what entity this affects)
 - entity_name: which specific entity
+- db_operation: a structured database operation to execute if approved. Must be one of:
+  {
+    "op": "update",
+    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_knowledge" | "extracted_items",
+    "match": {"column": "value"}, // how to find the row (e.g. {"school_name": "Allfarthing"} or {"child_id": "..."})
+    "set": {"column": "new_value"} // fields to update
+  }
+  OR
+  {
+    "op": "update_json",
+    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_knowledge",
+    "match": {"column": "value"},
+    "field": "staff" | "term_dates" | "policies" | "payment_systems" | "parents" | "emergency_contacts" | "enrolled_clubs",
+    "append": {...} // object to append to the JSON array field
+  }
+  OR
+  {
+    "op": "dismiss_item",
+    "item_ids": ["uuid", ...] // extracted_items to mark as dismissed
+  }
+
+Use actual entity names and child names from the data. For child_knowledge updates, use match: {"child_id": "ACTUAL_CHILD_ID"} from the children data above.
 
 Be specific. Reference actual names, dates, and data from the context. Don't suggest generic things like "add more data."
 
