@@ -244,19 +244,15 @@ export default function KnowledgeView() {
 
         {/* === Graph === */}
         {activeTab === "graph" && (
-          <Suspense fallback={<div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><p className="text-gray-400">Loading graph...</p></div>}>
-            <OntologyGraph data={{
-              schools: schools.map((s) => ({ school_name: s.school_name, staff: s.staff || [], payment_systems: s.payment_systems || [] })),
-              clubs: clubs.map((c) => ({ club_name: c.club_name, school_name: c.school_name, day_of_week: c.day_of_week, provider: c.provider, is_external: c.is_external })),
-              children: childRefs.map((cr) => {
-                const ck = childKnowledge.find((c) => c.child_id === cr.id);
-                const acts = (ck?.enrolled_clubs || []) as { club_name: string; day?: string }[];
-                return { name: cr.name, school_name: cr.school_name, activities: acts.map((a) => ({ activity_name: a.club_name, day_of_week: a.day || null })) };
-              }),
-              family: family ? { parents: (family.parents || []) as { name: string }[], emergency_contacts: (family.emergency_contacts || []) as { name: string }[] } : null,
-              logins: logins.map((l) => ({ provider_name: l.provider_name, category: l.category })),
-            }} />
-          </Suspense>
+          <GraphTab
+            householdId={householdId}
+            schools={schools}
+            clubs={clubs}
+            childRefs={childRefs}
+            childKnowledge={childKnowledge}
+            family={family}
+            logins={logins}
+          />
         )}
 
         {/* === Schools === */}
@@ -551,6 +547,168 @@ export default function KnowledgeView() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// --- Graph Tab with computed properties ---
+function GraphTab({ householdId, schools, clubs, childRefs, childKnowledge, family, logins }: {
+  householdId: string;
+  schools: SchoolKnowledge[];
+  clubs: ClubKnowledge[];
+  childRefs: ChildRef[];
+  childKnowledge: (ChildKnowledge & { name: string })[];
+  family: FamilyKnowledge | null;
+  logins: ProviderLogin[];
+}) {
+  const [computed, setComputed] = useState<Record<string, unknown> | null>(null);
+  const [linkStats, setLinkStats] = useState<{ created: number; types: Record<string, number> } | null>(null);
+  const [loadingComputed, setLoadingComputed] = useState(false);
+
+  const runOntology = async () => {
+    setLoadingComputed(true);
+    try {
+      const res = await fetch("/api/ontology", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ householdId, action: "full" }),
+      });
+      const data = await res.json();
+      if (data.properties) setComputed(data.properties);
+      if (data.links) setLinkStats(data.links);
+    } catch (err) {
+      console.error("Ontology error:", err);
+    } finally {
+      setLoadingComputed(false);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cp = computed as any;
+
+  return (
+    <div>
+      {/* Rebuild button */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          {linkStats && <p className="text-xs text-gray-400">{linkStats.created} links · {Object.keys(linkStats.types).length} relationship types</p>}
+        </div>
+        <button onClick={runOntology} disabled={loadingComputed}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {loadingComputed ? "Building..." : "Build Ontology"}
+        </button>
+      </div>
+
+      {/* Computed Properties Dashboard */}
+      {cp && (
+        <div className="mb-6 space-y-4">
+          {/* Family Summary */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Family Overview</h3>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">{cp.family?.totalChildren}</p>
+                <p className="text-xs text-gray-400">Children</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-amber-600">£{cp.family?.totalWeeklyCost?.toFixed(0)}</p>
+                <p className="text-xs text-gray-400">Weekly Cost</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{cp.family?.totalClubEnrollments}</p>
+                <p className="text-xs text-gray-400">Enrollments</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{cp.family?.uniqueClubs}</p>
+                <p className="text-xs text-gray-400">Unique Clubs</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-Child Cards */}
+          <div className="grid grid-cols-3 gap-3">
+            {(cp.children || []).map((child: { name: string; activitiesCount: number; weeklyCost: number; busyDay: string; busyDayCount: number; morningClubs: number; afterSchoolClubs: number }) => {
+              const colors: Record<string, string> = { "Bella Cotton": "border-l-pink-400", "Lucy Cotton": "border-l-blue-400", "Harry Cotton": "border-l-green-400" };
+              return (
+                <div key={child.name} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${colors[child.name] || ""} p-4`}>
+                  <p className="font-semibold text-gray-900 text-sm mb-2">{child.name.split(" ")[0]}</p>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between"><span className="text-gray-400">Activities</span><span className="font-medium">{child.activitiesCount}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Weekly cost</span><span className="font-medium text-amber-600">£{child.weeklyCost?.toFixed(0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Busiest day</span><span className="font-medium">{child.busyDay} ({child.busyDayCount})</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Morning clubs</span><span className="font-medium">{child.morningClubs}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">After school</span><span className="font-medium">{child.afterSchoolClubs}</span></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Drop-off / Pickup Schedule */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Drop-off & Pickup Times</h3>
+            <div className="grid grid-cols-5 gap-2">
+              {(cp.family?.morningDropOffs || []).map((d: { day: string; earliest: string; children: string[] }, i: number) => (
+                <div key={i} className="text-center">
+                  <p className="text-[10px] text-gray-400">{d.day.slice(0, 3)}</p>
+                  <p className="text-xs font-medium text-amber-600">{d.earliest}</p>
+                  <p className="text-[10px] text-gray-300">{d.children.map((n: string) => n.split(" ")[0]).join(", ")}</p>
+                  <div className="border-t border-gray-100 mt-1 pt-1">
+                    <p className="text-xs font-medium text-blue-600">{(cp.family?.eveningPickups || [])[i]?.latest || "–"}</p>
+                    <p className="text-[10px] text-gray-300">{((cp.family?.eveningPickups || [])[i]?.children || []).map((n: string) => n.split(" ")[0]).join(", ")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Link Types */}
+          {linkStats && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Ontology Links</h3>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(linkStats.types).map(([type, count]) => (
+                  <span key={type} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                    {type}: {count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* School Stats */}
+          {(cp.school || []).map((s: { name: string; totalStaff: number; totalClubs: number; externalClubs: number; schoolRunClubs: number }) => (
+            <div key={s.name} className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{s.name}</h3>
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div><p className="text-lg font-bold text-gray-900">{s.totalStaff}</p><p className="text-xs text-gray-400">Staff</p></div>
+                <div><p className="text-lg font-bold text-gray-900">{s.totalClubs}</p><p className="text-xs text-gray-400">Clubs</p></div>
+                <div><p className="text-lg font-bold text-gray-900">{s.schoolRunClubs}</p><p className="text-xs text-gray-400">School-run</p></div>
+                <div><p className="text-lg font-bold text-gray-900">{s.externalClubs}</p><p className="text-xs text-gray-400">External</p></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Graph */}
+      <Suspense fallback={<div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><p className="text-gray-400">Loading graph...</p></div>}>
+        <OntologyGraph data={{
+          schools: schools.map((s) => ({ school_name: s.school_name, staff: s.staff || [], payment_systems: s.payment_systems || [] })),
+          clubs: clubs.map((c) => ({ club_name: c.club_name, school_name: c.school_name, day_of_week: c.day_of_week, provider: c.provider, is_external: c.is_external })),
+          children: childRefs.map((cr) => {
+            const ck = childKnowledge.find((c) => c.child_id === cr.id);
+            const acts = (ck?.enrolled_clubs || []) as { club_name: string; day?: string }[];
+            return { name: cr.name, school_name: cr.school_name, activities: acts.map((a) => ({ activity_name: a.club_name, day_of_week: a.day || null })) };
+          }),
+          family: family ? { parents: (family.parents || []) as { name: string }[], emergency_contacts: (family.emergency_contacts || []) as { name: string }[] } : null,
+          logins: logins.map((l) => ({ provider_name: l.provider_name, category: l.category })),
+        }} />
+      </Suspense>
+
+      {!cp && !loadingComputed && (
+        <p className="text-center text-sm text-gray-300 mt-4">Click "Build Ontology" to compute properties, rebuild links, and populate the graph.</p>
+      )}
     </div>
   );
 }
