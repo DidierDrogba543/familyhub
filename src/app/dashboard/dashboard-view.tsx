@@ -8,6 +8,7 @@ interface ChildActivity {
   activity_name: string;
   day_of_week: string | null;
   time_slot: string | null;
+  term: string | null;
 }
 
 interface Child {
@@ -90,6 +91,7 @@ export default function DashboardView() {
   const [newActivity, setNewActivity] = useState({ activity_name: "", day_of_week: "", time_slot: "" });
   const [showAddSender, setShowAddSender] = useState(false);
   const [newSender, setNewSender] = useState({ email_address: "", label: "", category: "school" as const });
+  const [settingsTermFilter, setSettingsTermFilter] = useState("Summer 2026");
 
   const supabase = createClient();
 
@@ -112,7 +114,7 @@ export default function DashboardView() {
 
       const childrenWithActivities: Child[] = [];
       for (const child of childrenRes.data ?? []) {
-        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot").eq("child_id", child.id);
+        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot, term").eq("child_id", child.id);
         childrenWithActivities.push({ ...child, activities: activities ?? [] });
       }
       setChildren(childrenWithActivities);
@@ -140,14 +142,15 @@ export default function DashboardView() {
         await supabase.from("school_knowledge").insert({ household_id: householdId, school_name: newChild.school_name, staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [] });
       }
       // Auto-create child knowledge entry
-      await supabase.from("child_knowledge").insert({ child_id: savedChild.id }).catch(() => {});
+      const { error: ckErr } = await supabase.from("child_knowledge").insert({ child_id: savedChild.id });
+      if (ckErr) console.log("Child knowledge exists or error:", ckErr.message);
       setNewChild({ name: "", school_name: "", year_group: "" }); setShowAddChild(false);
     }
   };
 
   const addActivity = async (childId: string) => {
     if (!newActivity.activity_name) return;
-    const { data } = await supabase.from("child_activities").insert({ child_id: childId, activity_name: newActivity.activity_name, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null }).select("id, activity_name, day_of_week, time_slot").single();
+    const { data } = await supabase.from("child_activities").insert({ child_id: childId, activity_name: newActivity.activity_name, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null, term: settingsTermFilter }).select("id, activity_name, day_of_week, time_slot, term").single();
     if (data) {
       setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: [...c.activities, data] }));
     }
@@ -316,17 +319,44 @@ export default function DashboardView() {
           <div className="space-y-8">
             {/* Children */}
             <div>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Your Children</h2>
-              {children.map((child) => (
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your Children</h2>
+              </div>
+
+              {/* Term filter */}
+              {(() => {
+                const allTerms = [...new Set(children.flatMap((c) => c.activities.map((a) => a.term)).filter(Boolean))] as string[];
+                return allTerms.length > 0 ? (
+                  <div className="flex gap-2 mb-4 flex-wrap">
+                    {allTerms.map((term) => (
+                      <button key={term} onClick={() => setSettingsTermFilter(term)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium ${settingsTermFilter === term ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
+                        {term}
+                      </button>
+                    ))}
+                    <button onClick={() => setSettingsTermFilter("all")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${settingsTermFilter === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
+                      All Terms
+                    </button>
+                  </div>
+                ) : null;
+              })()}
+
+              {children.map((child) => {
+                const filteredActivities = settingsTermFilter === "all"
+                  ? child.activities
+                  : child.activities.filter((a) => a.term === settingsTermFilter);
+                return (
                 <div key={child.id} className="bg-white rounded-xl p-4 mb-3 border border-gray-200">
                   <div className="flex items-start justify-between">
                     <p className="font-semibold text-gray-900">{child.name}</p>
                     <button onClick={() => removeChild(child.id, child.name)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
                   </div>
                   <p className="text-sm text-gray-500">{child.school_name}{child.year_group ? ` · ${child.year_group}` : ""}</p>
-                  {child.activities.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-2">{filteredActivities.length} activities{settingsTermFilter !== "all" ? ` in ${settingsTermFilter}` : ""}</p>
+                  {filteredActivities.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {child.activities.map((act) => (
+                      {filteredActivities.map((act) => (
                         <span key={act.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full group">
                           {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
                           <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
@@ -349,7 +379,8 @@ export default function DashboardView() {
                     <button onClick={() => setAddingActivityFor(child.id)} className="mt-2 text-xs text-blue-500 hover:text-blue-600">+ Add activity</button>
                   )}
                 </div>
-              ))}
+              );
+              })}
               {showAddChild ? (
                 <div className="bg-white rounded-xl p-4 mb-3 border-2 border-blue-200 space-y-3">
                   <input type="text" value={newChild.name} onChange={(e) => setNewChild({ ...newChild, name: e.target.value })} placeholder="Child's name" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
@@ -385,7 +416,7 @@ export default function DashboardView() {
                 <div className="bg-white rounded-xl p-4 border-2 border-green-200 space-y-3">
                   <input type="email" value={newSender.email_address} onChange={(e) => setNewSender({ ...newSender, email_address: e.target.value })} placeholder="Email address" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                   <input type="text" value={newSender.label} onChange={(e) => setNewSender({ ...newSender, label: e.target.value })} placeholder="Label" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                  <select value={newSender.category} onChange={(e) => setNewSender({ ...newSender, category: e.target.value as "school" | "club" | "pta" | "afterschool" | "other" })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <select value={newSender.category} onChange={(e) => setNewSender({ ...newSender, category: e.target.value as typeof newSender.category })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     <option value="school">School</option><option value="club">Club</option><option value="pta">PTA</option><option value="afterschool">After-school</option><option value="other">Other</option>
                   </select>
                   <div className="flex gap-2">

@@ -86,7 +86,8 @@ export async function downloadAndExtract(url: string): Promise<{
     }
 
     if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
-      const pdfModule = await import("pdf-parse");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfModule = await import("pdf-parse") as any;
       const pdfParse = pdfModule.default || pdfModule;
       const result = await pdfParse(buffer);
       return { text: result.text, filename, mimeType: "application/pdf" };

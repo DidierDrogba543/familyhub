@@ -149,7 +149,7 @@ export default function KnowledgeView() {
     const { data } = await supabase.from("school_knowledge").insert({
       household_id: householdId, school_name: schoolName, staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [],
     }).select("id, school_name").single();
-    if (data) setSchools([...schools, data]);
+    if (data) setSchools([...schools, { ...data, address: null, phone: null, email: null, website: null, staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [], updated_at: "" } as SchoolKnowledge]);
   };
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Loading...</p></div>;

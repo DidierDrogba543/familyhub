@@ -346,8 +346,8 @@ function SuggestionCard({ suggestion: s, isApplying, isEditing, editValues, erro
           {s.db_operation && !isEditing && (
             <div className="mt-2 bg-gray-900 rounded-lg p-3 text-xs font-mono text-green-400 overflow-x-auto">
               <span className="text-gray-500">{s.db_operation.op}</span> {s.db_operation.table || ""}
-              {s.db_operation.set && <span> SET {Object.entries(s.db_operation.set).map(([k, v]) => `${k}="${v}"`).join(", ")}</span>}
-              {s.db_operation.append && <span> APPEND {JSON.stringify(s.db_operation.append)}</span>}
+              {s.db_operation.set && <span> SET {Object.entries(s.db_operation.set).map(([k, v]) => `${k}="${String(v)}"`).join(", ")}</span>}
+              {s.db_operation.append != null && <span> APPEND {JSON.stringify(s.db_operation.append)}</span>}
               {s.db_operation.item_ids && <span> IDS [{s.db_operation.item_ids.length} items]</span>}
             </div>
           )}
