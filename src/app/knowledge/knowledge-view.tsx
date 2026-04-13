@@ -64,6 +64,7 @@ interface ProviderLogin {
   url: string | null;
   username: string | null;
   email: string | null;
+  password: string | null;
   notes: string | null;
   category: string;
 }
@@ -89,7 +90,7 @@ export default function KnowledgeView() {
   const [householdId, setHouseholdId] = useState("");
   const [activeTab, setActiveTab] = useState<"schools" | "clubs" | "children" | "family" | "logins" | "log">("schools");
   const [showAddLogin, setShowAddLogin] = useState(false);
-  const [newLogin, setNewLogin] = useState({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" });
+  const [newLogin, setNewLogin] = useState({ provider_name: "", url: "", username: "", email: "", password: "", notes: "", category: "school" });
 
   const supabase = createClient();
 
@@ -107,7 +108,7 @@ export default function KnowledgeView() {
         supabase.from("children").select("id, name, school_name").eq("household_id", household.id),
         supabase.from("family_info").select("id, household_id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", household.id).single(),
         supabase.from("ontology_updates").select("id, source_subject, entities_updated, created_at").eq("household_id", household.id).order("created_at", { ascending: false }).limit(20),
-        supabase.from("provider_logins").select("id, provider_name, url, username, email, notes, category").eq("household_id", household.id).order("provider_name"),
+        supabase.from("provider_logins").select("id, provider_name, url, username, email, password, notes, category").eq("household_id", household.id).order("provider_name"),
       ]);
 
       setSchools(schoolsRes.data ?? []);
@@ -198,12 +199,13 @@ export default function KnowledgeView() {
       url: newLogin.url || null,
       username: newLogin.username || null,
       email: newLogin.email || null,
+      password: newLogin.password || null,
       notes: newLogin.notes || null,
       category: newLogin.category,
-    }).select("id, provider_name, url, username, email, notes, category").single();
+    }).select("id, provider_name, url, username, email, password, notes, category").single();
     if (data) {
       setLogins([...logins, data]);
-      setNewLogin({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" });
+      setNewLogin({ provider_name: "", url: "", username: "", email: "", password: "", notes: "", category: "school" });
       setShowAddLogin(false);
     }
   };
@@ -449,7 +451,7 @@ export default function KnowledgeView() {
                             {login.url}
                           </a>
                         )}
-                        <div className="grid grid-cols-2 gap-x-4 mt-2">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
                           {login.username && (
                             <div>
                               <p className="text-[10px] text-gray-400">Username</p>
@@ -461,6 +463,9 @@ export default function KnowledgeView() {
                               <p className="text-[10px] text-gray-400">Email</p>
                               <p className="text-sm text-gray-700">{login.email}</p>
                             </div>
+                          )}
+                          {login.password && (
+                            <PasswordField password={login.password} />
                           )}
                         </div>
                         {login.notes && <p className="text-sm text-gray-400 mt-2">{login.notes}</p>}
@@ -481,6 +486,7 @@ export default function KnowledgeView() {
                   <input type="text" value={newLogin.username} onChange={(e) => setNewLogin({ ...newLogin, username: e.target.value })} placeholder="Username (optional)" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                   <input type="email" value={newLogin.email} onChange={(e) => setNewLogin({ ...newLogin, email: e.target.value })} placeholder="Email (optional)" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
+                <input type="password" value={newLogin.password} onChange={(e) => setNewLogin({ ...newLogin, password: e.target.value })} placeholder="Password (optional)" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <select value={newLogin.category} onChange={(e) => setNewLogin({ ...newLogin, category: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                   <option value="school">School</option>
                   <option value="communication">Communication</option>
@@ -491,7 +497,7 @@ export default function KnowledgeView() {
                 <textarea value={newLogin.notes} onChange={(e) => setNewLogin({ ...newLogin, notes: e.target.value })} placeholder="Notes (e.g. login with Google account, password in 1Password)" rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 <div className="flex gap-2">
                   <button onClick={addLogin} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save</button>
-                  <button onClick={() => { setShowAddLogin(false); setNewLogin({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" }); }} className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => { setShowAddLogin(false); setNewLogin({ provider_name: "", url: "", username: "", email: "", password: "", notes: "", category: "school" }); }} className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -524,6 +530,25 @@ export default function KnowledgeView() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// --- Password Field with show/hide ---
+function PasswordField({ password }: { password: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div>
+      <p className="text-[10px] text-gray-400">Password</p>
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-gray-700 font-mono">{visible ? password : "••••••••"}</p>
+        <button onClick={() => setVisible(!visible)} className="text-[10px] text-blue-500 hover:text-blue-600">
+          {visible ? "Hide" : "Show"}
+        </button>
+        <button onClick={() => navigator.clipboard.writeText(password)} className="text-[10px] text-gray-400 hover:text-gray-600">
+          Copy
+        </button>
       </div>
     </div>
   );
