@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     supabase.from("school_knowledge").select("*").eq("household_id", householdId),
     supabase.from("club_knowledge").select("*").eq("household_id", householdId),
     supabase.from("child_knowledge").select("*"),
-    supabase.from("family_knowledge").select("*").eq("household_id", householdId).single(),
+    supabase.from("family_knowledge").select("id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", householdId).single(),
     supabase.from("extracted_items").select("id, type, title, date, deadline, child_name, urgency, confidence, needs_review, source_subject, raw_snippet").eq("household_id", householdId).eq("dismissed", false).order("created_at", { ascending: false }).limit(50),
     supabase.from("known_senders").select("*").eq("household_id", householdId),
   ]);
