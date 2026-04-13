@@ -72,7 +72,7 @@ export default function AdminView() {
   const loadSuggestions = async (hid: string) => {
     const { data } = await supabase
       .from("admin_suggestions")
-      .select("*")
+      .select("id, type, priority, title, description, action, entity_type, entity_name, db_operation, status, run_id, created_at, applied_at")
       .eq("household_id", hid)
       .order("created_at", { ascending: false })
       .limit(100);

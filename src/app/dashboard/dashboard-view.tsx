@@ -100,7 +100,7 @@ export default function DashboardView() {
       const [childrenRes, sendersRes, itemsRes] = await Promise.all([
         supabase.from("children").select("id, name, school_name, year_group").eq("household_id", household.id),
         supabase.from("known_senders").select("id, email_address, label, category").eq("household_id", household.id),
-        supabase.from("extracted_items").select("*").eq("household_id", household.id).eq("dismissed", false).order("created_at", { ascending: false }).limit(200),
+        supabase.from("extracted_items").select("id, type, title, date, deadline, child_name, urgency, action_url, source_subject, source_sender, confidence, raw_snippet, needs_review, dismissed, created_at").eq("household_id", household.id).eq("dismissed", false).order("created_at", { ascending: false }).limit(200),
       ]);
 
       const childrenWithActivities: Child[] = [];

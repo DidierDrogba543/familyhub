@@ -89,11 +89,11 @@ export default function KnowledgeView() {
       setHouseholdId(household.id);
 
       const [schoolsRes, clubsRes, childrenRes, familyRes, updatesRes] = await Promise.all([
-        supabase.from("school_knowledge").select("*").eq("household_id", household.id),
-        supabase.from("club_knowledge").select("*").eq("household_id", household.id).order("club_name"),
+        supabase.from("school_knowledge").select("id, school_name, address, phone, email, website, staff, term_dates, policies, payment_systems, notes, updated_at").eq("household_id", household.id),
+        supabase.from("club_knowledge").select("id, club_name, school_name, day_of_week, start_time, end_time, location, provider, is_external, year_groups, cost_per_session, booking_url, contact_email, cancellation_policy, updated_at").eq("household_id", household.id).order("club_name"),
         supabase.from("children").select("id, name, school_name").eq("household_id", household.id),
         supabase.from("family_info").select("id, household_id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", household.id).single(),
-        supabase.from("ontology_updates").select("*").eq("household_id", household.id).order("created_at", { ascending: false }).limit(20),
+        supabase.from("ontology_updates").select("id, source_subject, entities_updated, created_at").eq("household_id", household.id).order("created_at", { ascending: false }).limit(20),
       ]);
 
       setSchools(schoolsRes.data ?? []);
@@ -104,7 +104,7 @@ export default function KnowledgeView() {
 
       const ckList: (ChildKnowledge & { name: string })[] = [];
       for (const child of childrenRes.data ?? []) {
-        const { data: ck } = await supabase.from("child_knowledge").select("*").eq("child_id", child.id).single();
+        const { data: ck } = await supabase.from("child_knowledge").select("id, child_id, class_name, teacher_name, teaching_assistant, dietary_notes, medical_notes, enrolled_clubs, updated_at").eq("child_id", child.id).single();
         if (ck) ckList.push({ ...ck, name: child.name });
         else ckList.push({ id: "", child_id: child.id, name: child.name, class_name: null, teacher_name: null, teaching_assistant: null, dietary_notes: null, medical_notes: null, enrolled_clubs: [], updated_at: "" });
       }
@@ -148,7 +148,7 @@ export default function KnowledgeView() {
     const schoolName = childRefs[0]?.school_name || "New School";
     const { data } = await supabase.from("school_knowledge").insert({
       household_id: householdId, school_name: schoolName, staff: [], term_dates: [], policies: {}, payment_systems: [], notes: [],
-    }).select("*").single();
+    }).select("id, school_name").single();
     if (data) setSchools([...schools, data]);
   };
 
