@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     supabase.from("school_knowledge").select("*").eq("household_id", householdId),
     supabase.from("club_knowledge").select("*").eq("household_id", householdId),
     supabase.from("child_knowledge").select("*"),
-    supabase.from("family_knowledge").select("id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", householdId).single(),
+    supabase.from("family_info").select("id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", householdId).single(),
     supabase.from("extracted_items").select("id, type, title, date, deadline, child_name, urgency, confidence, needs_review, source_subject, raw_snippet").eq("household_id", householdId).eq("dismissed", false).order("created_at", { ascending: false }).limit(50),
     supabase.from("known_senders").select("*").eq("household_id", householdId),
   ]);
@@ -126,14 +126,14 @@ For each suggestion, provide:
 - db_operation: a structured database operation to execute if approved. Must be one of:
   {
     "op": "update",
-    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_knowledge" | "extracted_items",
+    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_info" | "extracted_items",
     "match": {"column": "value"}, // how to find the row (e.g. {"school_name": "Allfarthing"} or {"child_id": "..."})
     "set": {"column": "new_value"} // fields to update
   }
   OR
   {
     "op": "update_json",
-    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_knowledge",
+    "table": "school_knowledge" | "club_knowledge" | "child_knowledge" | "family_info",
     "match": {"column": "value"},
     "field": "staff" | "term_dates" | "policies" | "payment_systems" | "parents" | "emergency_contacts" | "enrolled_clubs",
     "append": {...} // object to append to the JSON array field

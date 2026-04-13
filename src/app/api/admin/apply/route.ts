@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       }
 
       // Scope to household for safety
-      if (["school_knowledge", "club_knowledge", "family_knowledge"].includes(operation.table)) {
+      if (["school_knowledge", "club_knowledge", "family_info"].includes(operation.table)) {
         query = query.eq("household_id", householdId);
       }
 
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       for (const [col, val] of Object.entries(resolvedMatch)) {
         readQuery = readQuery.eq(col, val);
       }
-      if (["school_knowledge", "club_knowledge", "family_knowledge"].includes(operation.table)) {
+      if (["school_knowledge", "club_knowledge", "family_info"].includes(operation.table)) {
         readQuery = readQuery.eq("household_id", householdId);
       }
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       for (const [col, val] of Object.entries(resolvedMatch)) {
         writeQuery = writeQuery.eq(col, val);
       }
-      if (["school_knowledge", "club_knowledge", "family_knowledge"].includes(operation.table)) {
+      if (["school_knowledge", "club_knowledge", "family_info"].includes(operation.table)) {
         writeQuery = writeQuery.eq("household_id", householdId);
       }
 
@@ -189,7 +189,7 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
       url: "website",
       site: "website",
     },
-    family_knowledge: {},
+    family_info: {},
     club_knowledge: {
       name: "club_name",
       day: "day_of_week",
@@ -207,7 +207,7 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
     child_knowledge: new Set(["class_name", "teacher_name", "teaching_assistant", "dietary_notes", "medical_notes", "sen_notes", "enrolled_clubs", "classmates", "achievements", "notes"]),
     school_knowledge: new Set(["school_name", "address", "phone", "email", "website", "staff", "term_dates", "policies", "channels", "pta_contacts", "pta_events", "payment_systems", "notes"]),
     club_knowledge: new Set(["club_name", "school_name", "day_of_week", "start_time", "end_time", "location", "provider", "is_external", "year_groups", "cost_per_session", "cost_per_term", "booking_method", "booking_url", "contact_email", "contact_phone", "cancellation_policy", "weather_policy", "behaviour_policy", "current_term", "is_active", "notes"]),
-    family_knowledge: new Set(["parents", "pickup_arrangements", "emergency_contacts", "payment_accounts", "preferences", "key_dates", "notes"]),
+    family_info: new Set(["parents", "pickup_arrangements", "emergency_contacts", "payment_accounts", "preferences", "key_dates", "notes"]),
   };
 
   const tableValid = validColumns[table];

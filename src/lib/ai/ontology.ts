@@ -40,7 +40,7 @@ export async function updateOntology(
     ctx.supabase.from("school_knowledge").select("school_name, staff, term_dates, policies, payment_systems").eq("household_id", ctx.householdId),
     ctx.supabase.from("club_knowledge").select("club_name, provider, day_of_week, cost_per_session").eq("household_id", ctx.householdId),
     ctx.supabase.from("child_knowledge").select("child_id, class_name, teacher_name, enrolled_clubs").limit(10),
-    ctx.supabase.from("family_knowledge").select("parents, payment_accounts").eq("household_id", ctx.householdId).single(),
+    ctx.supabase.from("family_info").select("parents, payment_accounts").eq("household_id", ctx.householdId).single(),
   ]);
 
   const existingSchools = (schoolRes.data ?? []).map((s) => s.school_name).join(", ") || "none";
@@ -314,8 +314,8 @@ async function upsertFamily(
   const fieldsUpdated: string[] = [];
 
   const { data: existing } = await ctx.supabase
-    .from("family_knowledge")
-    .select("*")
+    .from("family_info")
+    .select("id, parents, pickup_arrangements, emergency_contacts, payment_accounts, key_dates, notes")
     .eq("household_id", ctx.householdId)
     .single();
 
@@ -330,7 +330,7 @@ async function upsertFamily(
   }
 
   if (fieldsUpdated.length > 0) {
-    await ctx.supabase.from("family_knowledge").upsert({
+    await ctx.supabase.from("family_info").upsert({
       household_id: ctx.householdId,
       ...updateObj,
     }, { onConflict: "household_id" });

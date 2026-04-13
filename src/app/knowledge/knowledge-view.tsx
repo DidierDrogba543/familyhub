@@ -92,7 +92,7 @@ export default function KnowledgeView() {
         supabase.from("school_knowledge").select("*").eq("household_id", household.id),
         supabase.from("club_knowledge").select("*").eq("household_id", household.id).order("club_name"),
         supabase.from("children").select("id, name, school_name").eq("household_id", household.id),
-        supabase.from("family_knowledge").select("id, household_id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", household.id).single(),
+        supabase.from("family_info").select("id, household_id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", household.id).single(),
         supabase.from("ontology_updates").select("*").eq("household_id", household.id).order("created_at", { ascending: false }).limit(20),
       ]);
 
@@ -137,7 +137,7 @@ export default function KnowledgeView() {
   }, [saveViaApi]);
 
   const saveFamily = useCallback(async (field: string, value: unknown) => {
-    await saveViaApi("family_knowledge", {}, { [field]: value });
+    await saveViaApi("family_info", {}, { [field]: value });
     setFamily((prev) => {
       const base = prev ?? { id: "new", parents: [], pickup_arrangements: [], emergency_contacts: [], payment_accounts: [], key_dates: [], updated_at: new Date().toISOString() } as FamilyKnowledge;
       return { ...base, [field]: value };
