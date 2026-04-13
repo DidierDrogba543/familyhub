@@ -29,9 +29,12 @@ export async function POST(request: Request) {
       // Resolve child names to child_ids if needed
       const resolvedMatch = await resolveMatch(supabase, householdId, operation.table, operation.match);
 
+      // Fix common column name mismatches from AI
+      const fixedSet = fixColumnNames(operation.table, operation.set);
+
       // Simple field update
       let query = supabase.from(operation.table).update({
-        ...operation.set,
+        ...fixedSet,
         updated_at: new Date().toISOString(),
       });
 
@@ -150,4 +153,49 @@ async function resolveMatch(supabase: any, householdId: string, table: string, m
   }
 
   return resolved;
+}
+
+/**
+ * Fix common column name mismatches between what the AI generates
+ * and what the actual database schema uses.
+ */
+function fixColumnNames(table: string, data: Record<string, unknown>): Record<string, unknown> {
+  const fixed: Record<string, unknown> = {};
+
+  // Column aliases the AI commonly gets wrong
+  const aliases: Record<string, Record<string, string>> = {
+    child_knowledge: {
+      class: "class_name",
+      teacher: "teacher_name",
+      ta: "teaching_assistant",
+      assistant: "teaching_assistant",
+      dietary: "dietary_notes",
+      medical: "medical_notes",
+      sen: "sen_notes",
+    },
+    school_knowledge: {
+      name: "school_name",
+      telephone: "phone",
+      tel: "phone",
+      url: "website",
+      site: "website",
+    },
+    club_knowledge: {
+      name: "club_name",
+      day: "day_of_week",
+      start: "start_time",
+      end: "end_time",
+      cost: "cost_per_session",
+      contact: "contact_email",
+    },
+  };
+
+  const tableAliases = aliases[table] || {};
+
+  for (const [key, value] of Object.entries(data)) {
+    const fixedKey = tableAliases[key] || key;
+    fixed[fixedKey] = value;
+  }
+
+  return fixed;
 }
