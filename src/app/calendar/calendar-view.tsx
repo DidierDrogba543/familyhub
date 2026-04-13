@@ -12,6 +12,8 @@ interface ChildWithActivities {
     time_slot: string | null;
     notes: string | null;
     term: string | null;
+    link_url: string | null;
+    link_label: string | null;
   }[];
 }
 
@@ -78,7 +80,7 @@ export default function CalendarView() {
       for (const child of childrenRes.data ?? []) {
         const { data: acts } = await supabase
           .from("child_activities")
-          .select("activity_name, day_of_week, time_slot, notes, term")
+          .select("activity_name, day_of_week, time_slot, notes, term, link_url, link_label")
           .eq("child_id", child.id)
           .eq("term", "Summer 2026");
         childrenWithActs.push({ ...child, activities: acts ?? [] });
@@ -114,15 +116,15 @@ export default function CalendarView() {
 
   // Build day schedules
   const getDaySchedule = (dayName: string) => {
-    const morning: { child: string; activity: string; time: string; notes: string | null }[] = [];
-    const afterSchool: { child: string; activity: string; time: string; notes: string | null }[] = [];
-    const evening: { child: string; activity: string; time: string; notes: string | null }[] = [];
+    const morning: { child: string; activity: string; time: string; notes: string | null; link_url: string | null; link_label: string | null }[] = [];
+    const afterSchool: { child: string; activity: string; time: string; notes: string | null; link_url: string | null; link_label: string | null }[] = [];
+    const evening: { child: string; activity: string; time: string; notes: string | null; link_url: string | null; link_label: string | null }[] = [];
 
     for (const child of children) {
       const dayActs = child.activities.filter((a) => a.day_of_week === dayName);
       for (const act of dayActs) {
         const hour = getStartHour(act.time_slot);
-        const entry = { child: child.name, activity: act.activity_name, time: formatTime(act.time_slot), notes: act.notes };
+        const entry = { child: child.name, activity: act.activity_name, time: formatTime(act.time_slot), notes: act.notes, link_url: act.link_url, link_label: act.link_label };
         if (hour < 9) morning.push(entry);
         else if (hour >= 17) evening.push(entry);
         else afterSchool.push(entry);
@@ -232,6 +234,7 @@ export default function CalendarView() {
                                 <span className={`text-xs font-medium ${colors.text}`}>{entry.activity}</span>
                                 <span className="text-[10px] text-gray-400 ml-1.5">{firstName(entry.child)}</span>
                                 {entry.time && <span className="text-[10px] text-gray-400 ml-1">{entry.time}</span>}
+                                {entry.link_url && <a href={entry.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600 ml-1">{entry.link_label || "↗"}</a>}
                               </div>
                             );
                           })}
@@ -251,6 +254,7 @@ export default function CalendarView() {
                                 <span className={`text-xs font-medium ${colors.text}`}>{entry.activity}</span>
                                 <span className="text-[10px] text-gray-400 ml-1.5">{firstName(entry.child)}</span>
                                 {entry.time && <span className="text-[10px] text-gray-400 ml-1">{entry.time}</span>}
+                                {entry.link_url && <a href={entry.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600 ml-1">{entry.link_label || "↗"}</a>}
                               </div>
                             );
                           })}
@@ -270,6 +274,7 @@ export default function CalendarView() {
                                 <span className={`text-xs font-medium ${colors.text}`}>{entry.activity}</span>
                                 <span className="text-[10px] text-gray-400 ml-1.5">{firstName(entry.child)}</span>
                                 {entry.time && <span className="text-[10px] text-gray-400 ml-1">{entry.time}</span>}
+                                {entry.link_url && <a href={entry.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600 ml-1">{entry.link_label || "↗"}</a>}
                               </div>
                             );
                           })}

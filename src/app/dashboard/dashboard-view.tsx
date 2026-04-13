@@ -9,6 +9,8 @@ interface ChildActivity {
   day_of_week: string | null;
   time_slot: string | null;
   term: string | null;
+  link_url: string | null;
+  link_label: string | null;
 }
 
 interface Child {
@@ -88,7 +90,9 @@ export default function DashboardView() {
   const [showAddChild, setShowAddChild] = useState(false);
   const [newChild, setNewChild] = useState({ name: "", school_name: "", year_group: "" });
   const [addingActivityFor, setAddingActivityFor] = useState<string | null>(null);
-  const [newActivity, setNewActivity] = useState({ activity_name: "", day_of_week: "", time_slot: "" });
+  const [newActivity, setNewActivity] = useState({ activity_name: "", day_of_week: "", time_slot: "", link_url: "", link_label: "" });
+  const [editingLinkFor, setEditingLinkFor] = useState<string | null>(null);
+  const [editLink, setEditLink] = useState({ link_url: "", link_label: "" });
   const [showAddSender, setShowAddSender] = useState(false);
   const [newSender, setNewSender] = useState({ email_address: "", label: "", category: "school" as const });
   const [settingsTermFilter, setSettingsTermFilter] = useState("Summer 2026");
@@ -114,7 +118,7 @@ export default function DashboardView() {
 
       const childrenWithActivities: Child[] = [];
       for (const child of childrenRes.data ?? []) {
-        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot, term").eq("child_id", child.id);
+        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot, term, link_url, link_label").eq("child_id", child.id);
         childrenWithActivities.push({ ...child, activities: activities ?? [] });
       }
       setChildren(childrenWithActivities);
@@ -150,11 +154,28 @@ export default function DashboardView() {
 
   const addActivity = async (childId: string) => {
     if (!newActivity.activity_name) return;
-    const { data } = await supabase.from("child_activities").insert({ child_id: childId, activity_name: newActivity.activity_name, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null, term: settingsTermFilter }).select("id, activity_name, day_of_week, time_slot, term").single();
+    const { data } = await supabase.from("child_activities").insert({
+      child_id: childId,
+      activity_name: newActivity.activity_name,
+      day_of_week: newActivity.day_of_week || null,
+      time_slot: newActivity.time_slot || null,
+      term: settingsTermFilter,
+      link_url: newActivity.link_url || null,
+      link_label: newActivity.link_label || null,
+    }).select("id, activity_name, day_of_week, time_slot, term, link_url, link_label").single();
     if (data) {
       setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: [...c.activities, data] }));
     }
     setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" }); setAddingActivityFor(null);
+  };
+
+  const saveLinkToActivity = async (childId: string, activityId: string) => {
+    await supabase.from("child_activities").update({ link_url: editLink.link_url || null, link_label: editLink.link_label || null }).eq("id", activityId);
+    setChildren(children.map((c) => c.id !== childId ? c : {
+      ...c, activities: c.activities.map((a) => a.id !== activityId ? a : { ...a, link_url: editLink.link_url || null, link_label: editLink.link_label || null }),
+    }));
+    setEditingLinkFor(null);
+    setEditLink({ link_url: "", link_label: "" });
   };
 
   const removeActivity = async (childId: string, activityId: string) => {
@@ -355,13 +376,32 @@ export default function DashboardView() {
                   <p className="text-sm text-gray-500">{child.school_name}{child.year_group ? ` · ${child.year_group}` : ""}</p>
                   <p className="text-xs text-gray-400 mt-2">{filteredActivities.length} activities{settingsTermFilter !== "all" ? ` in ${settingsTermFilter}` : ""}</p>
                   {filteredActivities.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-2 space-y-1.5">
                       {filteredActivities.map((act) => (
-                        <span key={act.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full group">
-                          {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
-                          <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
-                        </span>
+                        <div key={act.id} className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                            {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
+                            <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
+                          </span>
+                          {act.link_url ? (
+                            <a href={act.link_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:text-blue-600">
+                              {act.link_label || "Link"} ↗
+                            </a>
+                          ) : (
+                            <button onClick={() => { setEditingLinkFor(act.id); setEditLink({ link_url: "", link_label: "" }); }} className="text-[10px] text-gray-300 hover:text-blue-500">+ link</button>
+                          )}
+                        </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Edit link form */}
+                  {editingLinkFor && filteredActivities.some((a) => a.id === editingLinkFor) && (
+                    <div className="mt-2 flex gap-2 items-end">
+                      <input type="url" value={editLink.link_url} onChange={(e) => setEditLink({ ...editLink, link_url: e.target.value })} placeholder="URL" className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
+                      <input type="text" value={editLink.link_label} onChange={(e) => setEditLink({ ...editLink, link_label: e.target.value })} placeholder="Label (e.g. Fixtures)" className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
+                      <button onClick={() => saveLinkToActivity(child.id, editingLinkFor)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium">Save</button>
+                      <button onClick={() => setEditingLinkFor(null)} className="text-xs text-gray-400">Cancel</button>
                     </div>
                   )}
                   {addingActivityFor === child.id ? (
