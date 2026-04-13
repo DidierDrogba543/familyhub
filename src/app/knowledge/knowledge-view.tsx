@@ -114,45 +114,35 @@ export default function KnowledgeView() {
     load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Save helpers ---
+  // --- Save helpers (all writes go through API to bypass RLS issues) ---
+  const saveViaApi = useCallback(async (table: string, match: Record<string, string>, set: Record<string, unknown>) => {
+    const res = await fetch("/api/admin/save-knowledge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ table, match, set, householdId }),
+    });
+    const result = await res.json();
+    if (!result.success) console.error("Save error:", result.error);
+    return result.success;
+  }, [householdId]);
+
   const saveSchoolField = useCallback(async (schoolId: string, field: string, value: unknown) => {
-    await supabase.from("school_knowledge").update({ [field]: value, updated_at: new Date().toISOString() }).eq("id", schoolId);
+    await saveViaApi("school_knowledge", { id: schoolId }, { [field]: value });
     setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, [field]: value } : s));
-  }, [supabase]);
+  }, [saveViaApi]);
 
   const saveChildField = useCallback(async (childId: string, field: string, value: unknown) => {
-    const existing = childKnowledge.find((c) => c.child_id === childId);
-    if (existing?.id) {
-      await supabase.from("child_knowledge").update({ [field]: value, updated_at: new Date().toISOString() }).eq("child_id", childId);
-    } else {
-      await supabase.from("child_knowledge").insert({ child_id: childId, [field]: value });
-    }
+    await saveViaApi("child_knowledge", { child_id: childId }, { [field]: value });
     setChildKnowledge((prev) => prev.map((c) => c.child_id === childId ? { ...c, [field]: value } : c));
-  }, [supabase, childKnowledge]);
+  }, [saveViaApi]);
 
   const saveFamily = useCallback(async (field: string, value: unknown) => {
-    if (family?.id && family.id !== "new") {
-      const { error } = await supabase.from("family_knowledge").update({ [field]: value, updated_at: new Date().toISOString() }).eq("household_id", householdId);
-      if (error) console.error("Family update error:", error.message);
-    } else {
-      const { error } = await supabase.from("family_knowledge").insert({
-        household_id: householdId,
-        parents: [],
-        pickup_arrangements: [],
-        emergency_contacts: [],
-        payment_accounts: [],
-        key_dates: [],
-        notes: [],
-        preferences: {},
-        [field]: value,
-      });
-      if (error) console.error("Family insert error:", error.message);
-    }
+    await saveViaApi("family_knowledge", {}, { [field]: value });
     setFamily((prev) => {
       const base = prev ?? { id: "new", parents: [], pickup_arrangements: [], emergency_contacts: [], payment_accounts: [], key_dates: [], updated_at: new Date().toISOString() } as FamilyKnowledge;
       return { ...base, [field]: value };
     });
-  }, [supabase, family, householdId]);
+  }, [saveViaApi]);
 
   const addSchool = async () => {
     const schoolName = childRefs[0]?.school_name || "New School";
