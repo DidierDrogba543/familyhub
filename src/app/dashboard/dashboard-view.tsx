@@ -216,8 +216,8 @@ export default function DashboardView() {
                     : "No new items"}
               </p>
             </div>
-            <button onClick={() => setShowSettings(!showSettings)} className="text-sm text-gray-400 hover:text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg">
-              {showSettings ? "Close" : "Settings"}
+            <button onClick={() => setShowSettings(!showSettings)} className={`text-sm px-3 py-1.5 rounded-lg ${showSettings ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600 border border-gray-200"}`}>
+              {showSettings ? "← Back" : "Settings"}
             </button>
           </div>
 
@@ -233,6 +233,7 @@ export default function DashboardView() {
 
       <div className="max-w-2xl mx-auto px-4 py-6">
 
+        {!showSettings && <>
         {/* Quick Stats */}
         {items.length > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-6">
@@ -294,9 +295,11 @@ export default function DashboardView() {
           </div>
         )}
 
-        {/* Settings Panel (collapsed) */}
+        </>}
+
+        {/* Settings Panel */}
         {showSettings && (
-          <div className="mt-8 space-y-8">
+          <div className="space-y-8">
             {/* Children */}
             <div>
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Your Children</h2>
