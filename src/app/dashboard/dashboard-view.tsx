@@ -166,7 +166,7 @@ export default function DashboardView() {
     if (data) {
       setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: [...c.activities, data] }));
     }
-    setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" }); setAddingActivityFor(null);
+    setNewActivity({ activity_name: "", day_of_week: "", time_slot: "", link_url: "", link_label: "" }); setAddingActivityFor(null);
   };
 
   const saveLinkToActivity = async (childId: string, activityId: string) => {
@@ -460,7 +460,7 @@ export default function DashboardView() {
                       </select>
                       <input type="text" value={newActivity.time_slot} onChange={(e) => setNewActivity({ ...newActivity, time_slot: e.target.value })} placeholder="Time" className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-xs" />
                       <button onClick={() => addActivity(child.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium">Add</button>
-                      <button onClick={() => { setAddingActivityFor(null); setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" }); }} className="px-2 py-1.5 text-xs text-gray-400">Cancel</button>
+                      <button onClick={() => { setAddingActivityFor(null); setNewActivity({ activity_name: "", day_of_week: "", time_slot: "", link_url: "", link_label: "" }); }} className="px-2 py-1.5 text-xs text-gray-400">Cancel</button>
                     </div>
                   ) : (
                     <button onClick={() => setAddingActivityFor(child.id)} className="mt-2 text-xs text-blue-500 hover:text-blue-600">+ Add activity</button>

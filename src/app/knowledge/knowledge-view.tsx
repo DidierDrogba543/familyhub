@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
+
+const OntologyGraph = lazy(() => import("./ontology-graph"));
 
 interface SchoolKnowledge {
   id: string;
@@ -88,7 +90,7 @@ export default function KnowledgeView() {
   const [logins, setLogins] = useState<ProviderLogin[]>([]);
   const [loading, setLoading] = useState(true);
   const [householdId, setHouseholdId] = useState("");
-  const [activeTab, setActiveTab] = useState<"schools" | "clubs" | "children" | "family" | "logins" | "log">("schools");
+  const [activeTab, setActiveTab] = useState<"graph" | "schools" | "clubs" | "children" | "family" | "logins" | "log">("graph");
   const [showAddLogin, setShowAddLogin] = useState(false);
   const [newLogin, setNewLogin] = useState({ provider_name: "", url: "", username: "", email: "", password: "", notes: "", category: "school" });
 
@@ -171,6 +173,7 @@ export default function KnowledgeView() {
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Loading...</p></div>;
 
   const tabs = [
+    { key: "graph" as const, label: "Graph", count: 0 },
     { key: "schools" as const, label: "Schools", count: schools.length },
     { key: "clubs" as const, label: "Clubs", count: clubs.length },
     { key: "children" as const, label: "Children", count: childKnowledge.length },
@@ -238,6 +241,23 @@ export default function KnowledgeView() {
             </button>
           ))}
         </div>
+
+        {/* === Graph === */}
+        {activeTab === "graph" && (
+          <Suspense fallback={<div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><p className="text-gray-400">Loading graph...</p></div>}>
+            <OntologyGraph data={{
+              schools: schools.map((s) => ({ school_name: s.school_name, staff: s.staff || [], payment_systems: s.payment_systems || [] })),
+              clubs: clubs.map((c) => ({ club_name: c.club_name, school_name: c.school_name, day_of_week: c.day_of_week, provider: c.provider, is_external: c.is_external })),
+              children: childRefs.map((cr) => {
+                const ck = childKnowledge.find((c) => c.child_id === cr.id);
+                const acts = (ck?.enrolled_clubs || []) as { club_name: string; day?: string }[];
+                return { name: cr.name, school_name: cr.school_name, activities: acts.map((a) => ({ activity_name: a.club_name, day_of_week: a.day || null })) };
+              }),
+              family: family ? { parents: (family.parents || []) as { name: string }[], emergency_contacts: (family.emergency_contacts || []) as { name: string }[] } : null,
+              logins: logins.map((l) => ({ provider_name: l.provider_name, category: l.category })),
+            }} />
+          </Suspense>
+        )}
 
         {/* === Schools === */}
         {activeTab === "schools" && (
