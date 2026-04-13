@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   // Whitelist tables
-  const allowedTables = ["school_knowledge", "child_knowledge", "family_info", "club_knowledge"];
+  const allowedTables = ["school_knowledge", "child_knowledge", "family_info", "club_knowledge", "provider_logins"];
   if (!allowedTables.includes(table)) {
     return NextResponse.json({ error: "Invalid table" }, { status: 400 });
   }

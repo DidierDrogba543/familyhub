@@ -58,6 +58,16 @@ interface FamilyKnowledge {
   updated_at: string;
 }
 
+interface ProviderLogin {
+  id: string;
+  provider_name: string;
+  url: string | null;
+  username: string | null;
+  email: string | null;
+  notes: string | null;
+  category: string;
+}
+
 interface OntologyUpdate {
   id: string;
   source_subject: string;
@@ -74,9 +84,12 @@ export default function KnowledgeView() {
   const [childRefs, setChildRefs] = useState<ChildRef[]>([]);
   const [family, setFamily] = useState<FamilyKnowledge | null>(null);
   const [updates, setUpdates] = useState<OntologyUpdate[]>([]);
+  const [logins, setLogins] = useState<ProviderLogin[]>([]);
   const [loading, setLoading] = useState(true);
   const [householdId, setHouseholdId] = useState("");
-  const [activeTab, setActiveTab] = useState<"schools" | "clubs" | "children" | "family" | "log">("schools");
+  const [activeTab, setActiveTab] = useState<"schools" | "clubs" | "children" | "family" | "logins" | "log">("schools");
+  const [showAddLogin, setShowAddLogin] = useState(false);
+  const [newLogin, setNewLogin] = useState({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" });
 
   const supabase = createClient();
 
@@ -88,12 +101,13 @@ export default function KnowledgeView() {
       if (!household) return;
       setHouseholdId(household.id);
 
-      const [schoolsRes, clubsRes, childrenRes, familyRes, updatesRes] = await Promise.all([
+      const [schoolsRes, clubsRes, childrenRes, familyRes, updatesRes, loginsRes] = await Promise.all([
         supabase.from("school_knowledge").select("id, school_name, address, phone, email, website, staff, term_dates, policies, payment_systems, notes, updated_at").eq("household_id", household.id),
         supabase.from("club_knowledge").select("id, club_name, school_name, day_of_week, start_time, end_time, location, provider, is_external, year_groups, cost_per_session, booking_url, contact_email, cancellation_policy, updated_at").eq("household_id", household.id).order("club_name"),
         supabase.from("children").select("id, name, school_name").eq("household_id", household.id),
         supabase.from("family_info").select("id, household_id, parents, pickup_arrangements, emergency_contacts, payment_accounts, preferences, key_dates, notes, updated_at").eq("household_id", household.id).single(),
         supabase.from("ontology_updates").select("id, source_subject, entities_updated, created_at").eq("household_id", household.id).order("created_at", { ascending: false }).limit(20),
+        supabase.from("provider_logins").select("id, provider_name, url, username, email, notes, category").eq("household_id", household.id).order("provider_name"),
       ]);
 
       setSchools(schoolsRes.data ?? []);
@@ -101,6 +115,7 @@ export default function KnowledgeView() {
       setChildRefs(childrenRes.data ?? []);
       setFamily(familyRes.data);
       setUpdates(updatesRes.data ?? []);
+      setLogins(loginsRes.data ?? []);
 
       const ckList: (ChildKnowledge & { name: string })[] = [];
       for (const child of childrenRes.data ?? []) {
@@ -159,8 +174,44 @@ export default function KnowledgeView() {
     { key: "clubs" as const, label: "Clubs", count: clubs.length },
     { key: "children" as const, label: "Children", count: childKnowledge.length },
     { key: "family" as const, label: "Family", count: family ? 1 : 0 },
+    { key: "logins" as const, label: "Logins", count: logins.length },
     { key: "log" as const, label: "Log", count: updates.length },
   ];
+
+  const addLogin = async () => {
+    if (!newLogin.provider_name) return;
+    const res = await fetch("/api/admin/save-knowledge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        table: "provider_logins",
+        match: {},
+        set: {},
+        householdId,
+        // Using a custom insert path
+      }),
+    });
+    // Direct insert via supabase for simplicity
+    const { data } = await supabase.from("provider_logins").insert({
+      household_id: householdId,
+      provider_name: newLogin.provider_name,
+      url: newLogin.url || null,
+      username: newLogin.username || null,
+      email: newLogin.email || null,
+      notes: newLogin.notes || null,
+      category: newLogin.category,
+    }).select("id, provider_name, url, username, email, notes, category").single();
+    if (data) {
+      setLogins([...logins, data]);
+      setNewLogin({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" });
+      setShowAddLogin(false);
+    }
+  };
+
+  const removeLogin = async (id: string) => {
+    await supabase.from("provider_logins").delete().eq("id", id);
+    setLogins(logins.filter((l) => l.id !== id));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -377,6 +428,79 @@ export default function KnowledgeView() {
               </div>
             ))}
             {clubs.length === 0 && <p className="text-gray-400 text-center py-8">Clubs are auto-populated from school emails.</p>}
+          </div>
+        )}
+
+        {/* === Logins === */}
+        {activeTab === "logins" && (
+          <div>
+            {logins.length > 0 && (
+              <div className="space-y-3 mb-6">
+                {logins.map((login) => (
+                  <div key={login.id} className="bg-white rounded-xl p-5 border border-gray-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold text-gray-900">{login.provider_name}</p>
+                          <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">{login.category}</span>
+                        </div>
+                        {login.url && (
+                          <a href={login.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-700 block mt-1">
+                            {login.url}
+                          </a>
+                        )}
+                        <div className="grid grid-cols-2 gap-x-4 mt-2">
+                          {login.username && (
+                            <div>
+                              <p className="text-[10px] text-gray-400">Username</p>
+                              <p className="text-sm text-gray-700">{login.username}</p>
+                            </div>
+                          )}
+                          {login.email && (
+                            <div>
+                              <p className="text-[10px] text-gray-400">Email</p>
+                              <p className="text-sm text-gray-700">{login.email}</p>
+                            </div>
+                          )}
+                        </div>
+                        {login.notes && <p className="text-sm text-gray-400 mt-2">{login.notes}</p>}
+                      </div>
+                      <button onClick={() => removeLogin(login.id)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showAddLogin ? (
+              <div className="bg-white rounded-xl p-5 border-2 border-blue-200 space-y-3">
+                <h3 className="font-semibold text-gray-900 mb-2">Add provider login</h3>
+                <input type="text" value={newLogin.provider_name} onChange={(e) => setNewLogin({ ...newLogin, provider_name: e.target.value })} placeholder="Provider name (e.g. ParentMail, SCOPAY)" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <input type="url" value={newLogin.url} onChange={(e) => setNewLogin({ ...newLogin, url: e.target.value })} placeholder="Login URL (e.g. https://pmx.parentmail.co.uk)" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" value={newLogin.username} onChange={(e) => setNewLogin({ ...newLogin, username: e.target.value })} placeholder="Username (optional)" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  <input type="email" value={newLogin.email} onChange={(e) => setNewLogin({ ...newLogin, email: e.target.value })} placeholder="Email (optional)" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <select value={newLogin.category} onChange={(e) => setNewLogin({ ...newLogin, category: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <option value="school">School</option>
+                  <option value="communication">Communication</option>
+                  <option value="payment">Payment</option>
+                  <option value="club">Club / Activity</option>
+                  <option value="other">Other</option>
+                </select>
+                <textarea value={newLogin.notes} onChange={(e) => setNewLogin({ ...newLogin, notes: e.target.value })} placeholder="Notes (e.g. login with Google account, password in 1Password)" rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <div className="flex gap-2">
+                  <button onClick={addLogin} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Save</button>
+                  <button onClick={() => { setShowAddLogin(false); setNewLogin({ provider_name: "", url: "", username: "", email: "", notes: "", category: "school" }); }} className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddLogin(true)} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 hover:border-gray-400 text-sm">+ Add provider login</button>
+            )}
+
+            {logins.length === 0 && !showAddLogin && (
+              <p className="text-center text-gray-300 text-sm mt-4">Store login details for school portals, payment systems, and club providers.</p>
+            )}
           </div>
         )}
 
