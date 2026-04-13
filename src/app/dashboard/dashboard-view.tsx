@@ -226,6 +226,7 @@ export default function DashboardView() {
             <a href="/calendar" className="px-4 py-2 bg-gray-100 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200">Calendar</a>
             <a href="/clubs" className="px-4 py-2 bg-gray-100 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200">Clubs</a>
             <a href="/knowledge" className="px-4 py-2 bg-gray-100 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200">Knowledge</a>
+            <a href="/admin" className="px-4 py-2 bg-gray-100 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-200">Admin</a>
           </div>
         </div>
       </div>
