@@ -190,6 +190,12 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
       site: "website",
     },
     family_info: {},
+    extracted_items: {
+      child: "child_name",
+      name: "title",
+      snippet: "raw_snippet",
+      source: "source_subject",
+    },
     club_knowledge: {
       name: "club_name",
       day: "day_of_week",
@@ -208,6 +214,7 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
     school_knowledge: new Set(["school_name", "address", "phone", "email", "website", "staff", "term_dates", "policies", "channels", "pta_contacts", "pta_events", "payment_systems", "notes"]),
     club_knowledge: new Set(["club_name", "school_name", "day_of_week", "start_time", "end_time", "location", "provider", "is_external", "year_groups", "cost_per_session", "cost_per_term", "booking_method", "booking_url", "contact_email", "contact_phone", "cancellation_policy", "weather_policy", "behaviour_policy", "current_term", "is_active", "notes"]),
     family_info: new Set(["parents", "pickup_arrangements", "emergency_contacts", "payment_accounts", "preferences", "key_dates", "notes"]),
+    extracted_items: new Set(["type", "title", "date", "deadline", "child_name", "urgency", "action_url", "source_channel", "source_subject", "source_sender", "confidence", "raw_snippet", "event_fingerprint", "needs_review", "dismissed", "corrected"]),
   };
 
   const tableValid = validColumns[table];
