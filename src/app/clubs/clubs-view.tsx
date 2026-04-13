@@ -18,6 +18,8 @@ interface ClubKnowledge {
   booking_url: string | null;
   contact_email: string | null;
   cancellation_policy: string | null;
+  current_term: string | null;
+  is_active: boolean;
 }
 
 interface Child {
@@ -50,6 +52,7 @@ export default function ClubsView() {
   const [activities, setActivities] = useState<ChildActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"by-day" | "by-child" | "all">("by-day");
+  const [selectedTerm, setSelectedTerm] = useState<string>("all");
 
   const supabase = createClient();
 
@@ -61,7 +64,7 @@ export default function ClubsView() {
       if (!household) return;
 
       const [clubsRes, childrenRes] = await Promise.all([
-        supabase.from("club_knowledge").select("id, club_name, school_name, day_of_week, start_time, end_time, location, provider, is_external, year_groups, cost_per_session, booking_url, contact_email, cancellation_policy").eq("household_id", household.id).order("club_name"),
+        supabase.from("club_knowledge").select("id, club_name, school_name, day_of_week, start_time, end_time, location, provider, is_external, year_groups, cost_per_session, booking_url, contact_email, cancellation_policy, current_term, is_active").eq("household_id", household.id).order("club_name"),
         supabase.from("children").select("id, name").eq("household_id", household.id),
       ]);
 
@@ -89,19 +92,25 @@ export default function ClubsView() {
   // Which clubs does a child attend?
   const clubsForChild = (childId: string) => {
     const actNames = activities.filter((a) => a.child_id === childId).map((a) => a.activity_name);
-    return clubs.filter((c) => actNames.includes(c.club_name));
+    return filteredClubs.filter((c) => actNames.includes(c.club_name));
   };
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Loading...</p></div>;
 
+  // Get unique terms
+  const terms = [...new Set(clubs.map((c) => c.current_term).filter(Boolean))] as string[];
+
+  // Filter clubs by selected term
+  const filteredClubs = selectedTerm === "all" ? clubs : clubs.filter((c) => c.current_term === selectedTerm);
+
   // Clubs by day
   const clubsByDay: Record<string, ClubKnowledge[]> = {};
   for (const day of DAYS) {
-    const dayClubs = clubs.filter((c) => c.day_of_week === day);
+    const dayClubs = filteredClubs.filter((c) => c.day_of_week === day);
     if (dayClubs.length > 0) clubsByDay[day] = dayClubs;
   }
   // Clubs with no day
-  const unscheduled = clubs.filter((c) => !c.day_of_week || !DAYS.includes(c.day_of_week));
+  const unscheduled = filteredClubs.filter((c) => !c.day_of_week || !DAYS.includes(c.day_of_week));
 
   // Morning vs afternoon vs evening
   const isMorning = (c: ClubKnowledge) => c.start_time && c.start_time < "12:00";
@@ -113,7 +122,7 @@ export default function ClubsView() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Clubs & Activities</h1>
-            <p className="text-sm text-gray-400">{clubs.length} clubs · {children.length} children</p>
+            <p className="text-sm text-gray-400">{filteredClubs.length} clubs · {children.length} children{selectedTerm !== "all" ? ` · ${selectedTerm}` : ""}</p>
           </div>
           <div className="flex gap-2 text-sm">
             <a href="/dashboard" className="text-blue-600 hover:text-blue-700">Dashboard</a>
@@ -123,6 +132,22 @@ export default function ClubsView() {
             <a href="/knowledge" className="text-blue-600 hover:text-blue-700">Knowledge</a>
           </div>
         </div>
+
+        {/* Term filter */}
+        {terms.length > 0 && (
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <button onClick={() => setSelectedTerm("all")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${selectedTerm === "all" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+              All Terms ({clubs.length})
+            </button>
+            {terms.map((term) => (
+              <button key={term} onClick={() => setSelectedTerm(term)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${selectedTerm === term ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                {term} ({clubs.filter((c) => c.current_term === term).length})
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* View toggle */}
         <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
@@ -222,13 +247,13 @@ export default function ClubsView() {
         {/* === All Clubs View === */}
         {viewMode === "all" && (
           <div className="space-y-3">
-            {clubs.map((club) => (
+            {filteredClubs.map((club) => (
               <ClubCard key={club.id} club={club} enrolledChildren={childrenForClub(club.club_name)} showDay />
             ))}
           </div>
         )}
 
-        {clubs.length === 0 && (
+        {filteredClubs.length === 0 && (
           <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
             <p className="text-gray-400 text-lg mb-2">No clubs yet</p>
             <p className="text-sm text-gray-300">Clubs are populated from email ingestion and the Knowledge Base.</p>
@@ -253,6 +278,7 @@ function ClubCard({ club, enrolledChildren, dayColor, compact, showDay }: {
           <div className="flex items-center gap-2">
             <p className={`font-semibold text-gray-900 ${compact ? "text-sm" : ""}`}>{club.club_name}</p>
             {club.is_external && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">External</span>}
+            {club.current_term && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{club.current_term}</span>}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
             {showDay && club.day_of_week && <span className="font-medium">{club.day_of_week} </span>}
