@@ -33,10 +33,11 @@ export async function POST(request: Request) {
       // Fix common column name mismatches from AI
       const fixedSet = fixColumnNames(operation.table, operation.set);
 
-      // Simple field update
+      // Simple field update — only add updated_at for tables that have it
+      const hasUpdatedAt = ["school_knowledge", "club_knowledge", "child_knowledge", "family_info"].includes(operation.table);
       let query = supabase.from(operation.table).update({
         ...fixedSet,
-        updated_at: new Date().toISOString(),
+        ...(hasUpdatedAt ? { updated_at: new Date().toISOString() } : {}),
       });
 
       // Apply match conditions
