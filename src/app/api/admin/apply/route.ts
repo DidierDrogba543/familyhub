@@ -26,6 +26,9 @@ export async function POST(request: Request) {
 
   try {
     if (operation.op === "update" && operation.table && operation.match && operation.set) {
+      // Resolve child names to child_ids if needed
+      const resolvedMatch = await resolveMatch(supabase, householdId, operation.table, operation.match);
+
       // Simple field update
       let query = supabase.from(operation.table).update({
         ...operation.set,
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
       });
 
       // Apply match conditions
-      for (const [col, val] of Object.entries(operation.match)) {
+      for (const [col, val] of Object.entries(resolvedMatch)) {
         query = query.eq(col, val);
       }
 
@@ -48,10 +51,13 @@ export async function POST(request: Request) {
       }
 
     } else if (operation.op === "update_json" && operation.table && operation.match && operation.field && operation.append) {
+      // Resolve child names to child_ids if needed
+      const resolvedMatch = await resolveMatch(supabase, householdId, operation.table, operation.match);
+
       // Append to a JSON array field
       // First, read the current value
       let readQuery = supabase.from(operation.table).select(operation.field);
-      for (const [col, val] of Object.entries(operation.match)) {
+      for (const [col, val] of Object.entries(resolvedMatch)) {
         readQuery = readQuery.eq(col, val);
       }
       if (["school_knowledge", "club_knowledge", "family_knowledge"].includes(operation.table)) {
@@ -67,7 +73,7 @@ export async function POST(request: Request) {
         [operation.field]: updatedArray,
         updated_at: new Date().toISOString(),
       });
-      for (const [col, val] of Object.entries(operation.match)) {
+      for (const [col, val] of Object.entries(resolvedMatch)) {
         writeQuery = writeQuery.eq(col, val);
       }
       if (["school_knowledge", "club_knowledge", "family_knowledge"].includes(operation.table)) {
@@ -108,4 +114,40 @@ export async function POST(request: Request) {
   } catch (err) {
     return NextResponse.json({ error: String(err), success: false });
   }
+}
+
+/**
+ * Resolve match conditions that might use names instead of IDs.
+ * The AI sometimes returns {"child_name": "Bella Cotton"} instead of {"child_id": "uuid"}.
+ * This function resolves names to actual database IDs.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveMatch(supabase: any, householdId: string, table: string, match: Record<string, string>): Promise<Record<string, string>> {
+  const resolved = { ...match };
+
+  // If matching child_knowledge by child_name, resolve to child_id
+  if (table === "child_knowledge" && resolved.child_name && !resolved.child_id) {
+    const { data: child } = await supabase
+      .from("children")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("name", resolved.child_name)
+      .single();
+    if (child) {
+      resolved.child_id = child.id;
+      delete resolved.child_name;
+    }
+  }
+
+  // If matching school_knowledge by school_name, ensure household scoping
+  if (table === "school_knowledge" && resolved.school_name) {
+    // school_name match is fine as-is, household scoped in the caller
+  }
+
+  // If matching club_knowledge by club_name, ensure household scoping
+  if (table === "club_knowledge" && resolved.club_name) {
+    // club_name match is fine as-is, household scoped in the caller
+  }
+
+  return resolved;
 }
