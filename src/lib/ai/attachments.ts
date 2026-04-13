@@ -58,7 +58,8 @@ export async function extractTextFromAttachments(
  */
 async function extractPdfText(data: Buffer): Promise<string> {
   // Dynamic import to avoid issues with pdf-parse in edge environments
-  const pdfParse = (await import("pdf-parse")).default;
+  const pdfModule = await import("pdf-parse");
+  const pdfParse = pdfModule.default || pdfModule;
   const result = await pdfParse(data);
   return result.text;
 }

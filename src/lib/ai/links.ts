@@ -86,7 +86,8 @@ export async function downloadAndExtract(url: string): Promise<{
     }
 
     if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
-      const pdfParse = (await import("pdf-parse")).default;
+      const pdfModule = await import("pdf-parse");
+      const pdfParse = pdfModule.default || pdfModule;
       const result = await pdfParse(buffer);
       return { text: result.text, filename, mimeType: "application/pdf" };
     }

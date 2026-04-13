@@ -95,15 +95,14 @@ export default function DashboardView() {
         .eq("household_id", household.id);
       setSenders(sendersData ?? []);
 
-      // Load extracted items (last 7 days, not dismissed)
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      // Load all extracted items (not dismissed), most recent first
       const { data: itemsData } = await supabase
         .from("extracted_items")
         .select("*")
         .eq("household_id", household.id)
         .eq("dismissed", false)
-        .gte("created_at", weekAgo)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
       setItems(itemsData ?? []);
 
       setLoading(false);

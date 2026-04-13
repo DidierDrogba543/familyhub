@@ -44,11 +44,20 @@ export async function fetchEmails(
     afterDate?: Date;
     pageToken?: string;
     maxResults?: number;
+    senderFilter?: string[]; // email addresses to filter by
   }
 ) {
-  const query = opts.afterDate
+  let query = opts.afterDate
     ? `after:${Math.floor(opts.afterDate.getTime() / 1000)}`
     : "";
+
+  // Build sender filter: from:a OR from:b OR from:c
+  if (opts.senderFilter && opts.senderFilter.length > 0) {
+    const senderQuery = opts.senderFilter
+      .map((s) => `from:${s}`)
+      .join(" OR ");
+    query = query ? `${query} {${senderQuery}}` : `{${senderQuery}}`;
+  }
 
   const listResponse = await gmail.users.messages.list({
     userId: "me",

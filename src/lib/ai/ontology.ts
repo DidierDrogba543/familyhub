@@ -265,9 +265,9 @@ async function upsertClub(
     await ctx.supabase.from("club_knowledge").upsert({
       household_id: ctx.householdId,
       club_name: clubName,
-      school_name: schoolName,
+      school_name: schoolName || "",
       ...updateObj,
-    }, { onConflict: "household_id,club_name,coalesce(school_name, '')" as string });
+    }, { onConflict: "household_id,club_name,school_name" });
   }
 
   return fieldsUpdated;

@@ -44,11 +44,15 @@ export async function ingestEmailBatch(
 }> {
   const { gmail, credentials } = createGmailClient(gmailCredentials);
 
-  // Fetch a batch of email IDs
+  // Build sender filter from known senders
+  const senderEmails = ctx.knownSenders.map((s) => s.email_address);
+
+  // Fetch a batch of email IDs (filtered by known senders if available)
   const { messages, nextPageToken } = await fetchEmails(gmail, {
     afterDate: opts.afterDate,
     pageToken: opts.pageToken,
     maxResults: BATCH_SIZE,
+    senderFilter: senderEmails.length > 0 ? senderEmails : undefined,
   });
 
   let itemsExtracted = 0;
@@ -140,53 +144,54 @@ export async function ingestEmailBatch(
     if (extractions.length === 0) {
       // Email classified as school-related but nothing extractable
       // Store as an info item so it's not lost
-      const { error } = await ctx.supabase.from("extracted_items").upsert(
-        {
-          household_id: ctx.householdId,
-          type: "info",
-          title: message.subject,
-          urgency: "low",
-          source_channel: "gmail",
-          source_subject: message.subject,
-          source_sender: message.from,
-          confidence: classification.confidence,
-          raw_snippet: message.snippet || message.body.slice(0, 200),
-          event_fingerprint: `info-${msg.id}`,
-          needs_review: classification.confidence < 0.7,
-          gmail_message_id: msg.id,
-        },
-        { onConflict: "household_id,event_fingerprint" }
-      );
-      if (error) console.error("Failed to store info item:", error);
+      const { error } = await ctx.supabase.from("extracted_items").insert({
+        household_id: ctx.householdId,
+        type: "info",
+        title: message.subject,
+        urgency: "low",
+        source_channel: "gmail",
+        source_subject: message.subject,
+        source_sender: message.from,
+        confidence: classification.confidence,
+        raw_snippet: message.snippet || message.body.slice(0, 200),
+        event_fingerprint: `info-${msg.id}`,
+        needs_review: classification.confidence < 0.7,
+        gmail_message_id: msg.id,
+      });
+      if (error) {
+        // Ignore duplicate fingerprint errors
+        if (!error.message?.includes("duplicate") && !error.code?.includes("23505")) {
+          console.error("Failed to store info item:", JSON.stringify(error));
+        }
+      }
       itemsExtracted++;
       continue;
     }
 
-    // Store extracted items (with dedup via event_fingerprint)
+    // Store extracted items (insert, skip duplicates)
     for (const item of extractions) {
-      const { error } = await ctx.supabase.from("extracted_items").upsert(
-        {
-          household_id: ctx.householdId,
-          type: item.type,
-          title: item.title,
-          date: item.date,
-          deadline: item.deadline,
-          child_name: item.child_name,
-          urgency: item.urgency,
-          action_url: item.action_url,
-          source_channel: "gmail",
-          source_subject: message.subject,
-          source_sender: message.from,
-          confidence: item.confidence,
-          raw_snippet: item.raw_snippet,
-          event_fingerprint: item.event_fingerprint,
-          needs_review: item.confidence < 0.7,
-          gmail_message_id: msg.id,
-        },
-        { onConflict: "household_id,event_fingerprint" }
-      );
-      if (error && !error.message.includes("duplicate")) {
-        console.error("Failed to store extracted item:", error);
+      const { error } = await ctx.supabase.from("extracted_items").insert({
+        household_id: ctx.householdId,
+        type: item.type,
+        title: item.title,
+        date: item.date,
+        deadline: item.deadline,
+        child_name: item.child_name,
+        urgency: item.urgency,
+        action_url: item.action_url,
+        source_channel: "gmail",
+        source_subject: message.subject,
+        source_sender: message.from,
+        confidence: item.confidence,
+        raw_snippet: item.raw_snippet,
+        event_fingerprint: item.event_fingerprint,
+        needs_review: item.confidence < 0.7,
+        gmail_message_id: msg.id,
+      });
+      if (error) {
+        if (!error.message?.includes("duplicate") && !error.code?.includes("23505")) {
+          console.error("Failed to store extracted item:", JSON.stringify(error));
+        }
       } else {
         itemsExtracted++;
       }
