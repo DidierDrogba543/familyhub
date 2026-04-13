@@ -189,6 +189,7 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
       url: "website",
       site: "website",
     },
+    family_knowledge: {},
     club_knowledge: {
       name: "club_name",
       day: "day_of_week",
@@ -201,9 +202,22 @@ function fixColumnNames(table: string, data: Record<string, unknown>): Record<st
 
   const tableAliases = aliases[table] || {};
 
+  // Known valid columns per table (prevents writing to non-existent columns)
+  const validColumns: Record<string, Set<string>> = {
+    child_knowledge: new Set(["class_name", "teacher_name", "teaching_assistant", "dietary_notes", "medical_notes", "sen_notes", "enrolled_clubs", "classmates", "achievements", "notes"]),
+    school_knowledge: new Set(["school_name", "address", "phone", "email", "website", "staff", "term_dates", "policies", "channels", "pta_contacts", "pta_events", "payment_systems", "notes"]),
+    club_knowledge: new Set(["club_name", "school_name", "day_of_week", "start_time", "end_time", "location", "provider", "is_external", "year_groups", "cost_per_session", "cost_per_term", "booking_method", "booking_url", "contact_email", "contact_phone", "cancellation_policy", "weather_policy", "behaviour_policy", "current_term", "is_active", "notes"]),
+    family_knowledge: new Set(["parents", "pickup_arrangements", "emergency_contacts", "payment_accounts", "preferences", "key_dates", "notes"]),
+  };
+
+  const tableValid = validColumns[table];
+
   for (const [key, value] of Object.entries(data)) {
     const fixedKey = tableAliases[key] || key;
-    fixed[fixedKey] = value;
+    // Only include columns that exist in the table
+    if (!tableValid || tableValid.has(fixedKey)) {
+      fixed[fixedKey] = value;
+    }
   }
 
   return fixed;

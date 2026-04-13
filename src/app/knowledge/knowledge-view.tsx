@@ -131,12 +131,27 @@ export default function KnowledgeView() {
   }, [supabase, childKnowledge]);
 
   const saveFamily = useCallback(async (field: string, value: unknown) => {
-    if (family?.id) {
-      await supabase.from("family_knowledge").update({ [field]: value, updated_at: new Date().toISOString() }).eq("household_id", householdId);
+    if (family?.id && family.id !== "new") {
+      const { error } = await supabase.from("family_knowledge").update({ [field]: value, updated_at: new Date().toISOString() }).eq("household_id", householdId);
+      if (error) console.error("Family update error:", error.message);
     } else {
-      await supabase.from("family_knowledge").insert({ household_id: householdId, [field]: value });
+      const { error } = await supabase.from("family_knowledge").insert({
+        household_id: householdId,
+        parents: [],
+        pickup_arrangements: [],
+        emergency_contacts: [],
+        payment_accounts: [],
+        key_dates: [],
+        notes: [],
+        preferences: {},
+        [field]: value,
+      });
+      if (error) console.error("Family insert error:", error.message);
     }
-    setFamily((prev) => prev ? { ...prev, [field]: value } : { id: "new", parents: [], pickup_arrangements: [], emergency_contacts: [], payment_accounts: [], key_dates: [], updated_at: new Date().toISOString(), [field]: value } as FamilyKnowledge);
+    setFamily((prev) => {
+      const base = prev ?? { id: "new", parents: [], pickup_arrangements: [], emergency_contacts: [], payment_accounts: [], key_dates: [], updated_at: new Date().toISOString() } as FamilyKnowledge;
+      return { ...base, [field]: value };
+    });
   }, [supabase, family, householdId]);
 
   const addSchool = async () => {
