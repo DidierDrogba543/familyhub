@@ -3,12 +3,19 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+interface ChildActivity {
+  id: string;
+  activity_name: string;
+  day_of_week: string | null;
+  time_slot: string | null;
+}
+
 interface Child {
   id: string;
   name: string;
   school_name: string;
   year_group: string | null;
-  activities: { activity_name: string; day_of_week: string | null; time_slot: string | null }[];
+  activities: ChildActivity[];
 }
 
 interface ExtractedItem {
@@ -105,7 +112,7 @@ export default function DashboardView() {
 
       const childrenWithActivities: Child[] = [];
       for (const child of childrenRes.data ?? []) {
-        const { data: activities } = await supabase.from("child_activities").select("activity_name, day_of_week, time_slot").eq("child_id", child.id);
+        const { data: activities } = await supabase.from("child_activities").select("id, activity_name, day_of_week, time_slot").eq("child_id", child.id);
         childrenWithActivities.push({ ...child, activities: activities ?? [] });
       }
       setChildren(childrenWithActivities);
@@ -140,9 +147,16 @@ export default function DashboardView() {
 
   const addActivity = async (childId: string) => {
     if (!newActivity.activity_name) return;
-    await supabase.from("child_activities").insert({ child_id: childId, activity_name: newActivity.activity_name, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null });
-    setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: [...c.activities, { ...newActivity, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null }] }));
+    const { data } = await supabase.from("child_activities").insert({ child_id: childId, activity_name: newActivity.activity_name, day_of_week: newActivity.day_of_week || null, time_slot: newActivity.time_slot || null }).select("id, activity_name, day_of_week, time_slot").single();
+    if (data) {
+      setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: [...c.activities, data] }));
+    }
     setNewActivity({ activity_name: "", day_of_week: "", time_slot: "" }); setAddingActivityFor(null);
+  };
+
+  const removeActivity = async (childId: string, activityId: string) => {
+    await supabase.from("child_activities").delete().eq("id", activityId);
+    setChildren(children.map((c) => c.id !== childId ? c : { ...c, activities: c.activities.filter((a) => a.id !== activityId) }));
   };
 
   const removeChild = async (childId: string, childName: string) => {
@@ -312,9 +326,10 @@ export default function DashboardView() {
                   <p className="text-sm text-gray-500">{child.school_name}{child.year_group ? ` · ${child.year_group}` : ""}</p>
                   {child.activities.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {child.activities.map((act, i) => (
-                        <span key={i} className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                      {child.activities.map((act) => (
+                        <span key={act.id} className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full group">
                           {act.activity_name}{act.day_of_week ? ` · ${act.day_of_week}` : ""}{act.time_slot ? ` ${act.time_slot}` : ""}
+                          <button onClick={() => removeActivity(child.id, act.id)} className="text-gray-400 hover:text-red-500 ml-0.5" title="Remove">×</button>
                         </span>
                       ))}
                     </div>
