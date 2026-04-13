@@ -96,7 +96,7 @@ ${items.slice(0, 20).map((i) => `- [${i.type}] ${i.title} | date: ${i.date || "n
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 3000,
+    max_tokens: 8000,
     messages: [
       {
         role: "user",
@@ -160,6 +160,16 @@ Respond with ONLY a JSON array of suggestions.`,
     const suggestions = JSON.parse(jsonText);
     return NextResponse.json({ suggestions });
   } catch {
+    // Try to salvage partial JSON — find the last complete object in the array
+    try {
+      // Find all complete objects by matching closing braces before the truncation
+      const lastBracket = jsonText.lastIndexOf("}");
+      if (lastBracket > 0) {
+        const trimmed = jsonText.slice(0, lastBracket + 1) + "]";
+        const suggestions = JSON.parse(trimmed);
+        return NextResponse.json({ suggestions, partial: true });
+      }
+    } catch { /* ignore */ }
     return NextResponse.json({ suggestions: [], raw: jsonText.slice(0, 500) });
   }
 }
