@@ -12,10 +12,11 @@ interface DbOperation {
 }
 
 export async function POST(request: Request) {
-  const { householdId, operation, suggestion } = await request.json() as {
+  const { householdId, operation, suggestion, suggestionId } = await request.json() as {
     householdId: string;
     operation: DbOperation;
     suggestion: { title: string; type: string; action: string };
+    suggestionId?: string; // database ID of the suggestion
   };
 
   if (!householdId || !operation) {
@@ -104,7 +105,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unknown operation type", success: false });
     }
 
-    // Log the applied suggestion
+    // Mark suggestion as applied in the database
+    if (suggestionId) {
+      await supabase.from("admin_suggestions").update({
+        status: "applied",
+        applied_at: new Date().toISOString(),
+      }).eq("id", suggestionId);
+    }
+
+    // Log the applied suggestion to ontology updates
     await supabase.from("ontology_updates").insert({
       household_id: householdId,
       gmail_message_id: "admin-suggestion",

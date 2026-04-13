@@ -156,20 +156,40 @@ Respond with ONLY a JSON array of suggestions.`,
   const text = response.content[0]?.type === "text" ? response.content[0].text : "[]";
   const jsonText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
+  let suggestions: unknown[] = [];
   try {
-    const suggestions = JSON.parse(jsonText);
-    return NextResponse.json({ suggestions });
+    suggestions = JSON.parse(jsonText);
   } catch {
-    // Try to salvage partial JSON — find the last complete object in the array
+    // Try to salvage partial JSON
     try {
-      // Find all complete objects by matching closing braces before the truncation
       const lastBracket = jsonText.lastIndexOf("}");
       if (lastBracket > 0) {
-        const trimmed = jsonText.slice(0, lastBracket + 1) + "]";
-        const suggestions = JSON.parse(trimmed);
-        return NextResponse.json({ suggestions, partial: true });
+        suggestions = JSON.parse(jsonText.slice(0, lastBracket + 1) + "]");
       }
     } catch { /* ignore */ }
-    return NextResponse.json({ suggestions: [], raw: jsonText.slice(0, 500) });
   }
+
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    return NextResponse.json({ suggestions: [], runId: null });
+  }
+
+  // Save suggestions to database
+  const runId = `run-${Date.now()}`;
+  const rows = suggestions.map((s: Record<string, unknown>) => ({
+    household_id: householdId,
+    type: s.type || "ENRICH",
+    priority: s.priority || "medium",
+    title: s.title || "Untitled",
+    description: s.description || "",
+    action: s.action || "",
+    entity_type: s.entity_type || "unknown",
+    entity_name: s.entity_name || "unknown",
+    db_operation: s.db_operation || null,
+    status: "pending",
+    run_id: runId,
+  }));
+
+  await supabase.from("admin_suggestions").insert(rows);
+
+  return NextResponse.json({ suggestions, runId });
 }
