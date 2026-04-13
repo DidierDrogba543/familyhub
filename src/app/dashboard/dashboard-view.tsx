@@ -272,6 +272,53 @@ export default function DashboardView() {
       <div className="max-w-2xl mx-auto px-4 py-6">
 
         {!showSettings && <>
+
+        {/* Weekly Summary per Child */}
+        {children.length > 0 && (
+          <div className="mb-6">
+            {children.map((child) => {
+              const colors = { "Bella Cotton": "border-l-pink-400 bg-pink-50/30", "Lucy Cotton": "border-l-blue-400 bg-blue-50/30", "Harry Cotton": "border-l-green-400 bg-green-50/30" }[child.name] || "border-l-gray-300";
+              const termActs = child.activities.filter((a) => a.term === "Summer 2026");
+              const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+              const DAYSFULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+              return (
+                <div key={child.id} className={`bg-white rounded-xl border border-gray-200 border-l-4 ${colors} mb-3 p-4`}>
+                  <p className="font-semibold text-gray-900 text-sm mb-2">{child.name}</p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {DAYS.map((day, di) => {
+                      const dayActs = termActs
+                        .filter((a) => a.day_of_week === DAYSFULL[di])
+                        .sort((a, b) => (a.time_slot || "").localeCompare(b.time_slot || ""));
+                      return (
+                        <div key={day} className="min-h-[48px]">
+                          <p className="text-[10px] text-gray-400 font-medium mb-1">{day}</p>
+                          {dayActs.length > 0 ? dayActs.map((act, j) => {
+                            const hour = act.time_slot ? parseInt(act.time_slot.split(":")[0]) : 12;
+                            const timeColor = hour < 9 ? "text-amber-600" : hour >= 15 ? "text-blue-600" : "text-gray-600";
+                            return (
+                              <div key={j} className="mb-0.5">
+                                <p className={`text-[10px] font-medium leading-tight ${timeColor}`}>
+                                  {act.activity_name.replace(" (morning)", " ☀").replace(" (evening)", " 🌙")}
+                                </p>
+                                {act.link_url && (
+                                  <a href={act.link_url} target="_blank" rel="noopener noreferrer" className="text-[8px] text-blue-400 hover:text-blue-500">{act.link_label || "↗"}</a>
+                                )}
+                              </div>
+                            );
+                          }) : (
+                            <p className="text-[10px] text-gray-200">–</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Quick Stats */}
         {items.length > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-6">
